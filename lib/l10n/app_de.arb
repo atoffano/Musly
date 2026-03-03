@@ -1096,6 +1096,14 @@
   "@collapse": {
     "description": "Tooltip/label for the sidebar collapse button"
   },
+  "expand": "erweitern",
+  "@expand": {
+    "description": "Tooltip/label for the sidebar expand button"
+  },
+  "createPlaylist": "Playlist erstellen",
+  "@createPlaylist": {
+    "description": "Tooltip/label for the create-playlist button in the sidebar library header"
+  },
   "likedSongsSidebar": "Lieblingssongs",
   "@likedSongsSidebar": {
     "description": "Liked Songs item label in the desktop sidebar"
@@ -1288,6 +1296,18 @@
     }
   },
   "@_GENRE_SCREEN": {},
+  "errorLoadingGenres": "Fehler beim Laden des Genres",
+  "@errorLoadingGenres": {
+    "description": "Error message when the genre list fails to load"
+  },
+  "noGenresFound": "Kein Genre gefunden",
+  "@noGenresFound": {
+    "description": "Empty state when no genres are returned from the server"
+  },
+  "noAlbumsInGenre": "Kein Album in diesem Genre",
+  "@noAlbumsInGenre": {
+    "description": "Empty state on the Albums tab of the genre screen"
+  },
   "@_JUKEBOX": {},
   "@_MUSIC_FOLDERS": {}
 }
