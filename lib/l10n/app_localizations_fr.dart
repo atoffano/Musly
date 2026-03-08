@@ -482,14 +482,14 @@ class AppLocalizationsFr extends AppLocalizations {
   String get browseCategories => 'Parcourir les catégories';
 
   @override
-  String get liveSearchSection => 'Search';
+  String get liveSearchSection => 'Rechercher';
 
   @override
   String get liveSearch => 'Live Search';
 
   @override
   String get liveSearchSubtitle =>
-      'Update results as you type instead of showing a dropdown';
+      'Mettre à jour les résultats lorsque vous écrivez au lieu d\'afficher une liste déroulante';
 
   @override
   String get categoryMadeForYou => 'Fait pour vous';
@@ -1307,14 +1307,14 @@ class AppLocalizationsFr extends AppLocalizations {
   String get noArtwork => 'Pas de pochette d\'album';
 
   @override
-  String get serverUnreachableTitle => 'Cannot reach server';
+  String get serverUnreachableTitle => 'Impossible d\'atteindre le serveur';
 
   @override
   String get serverUnreachableSubtitle =>
-      'Check your connection or server settings.';
+      'Vérifier votre connexion ou vos paramètres de serveur.';
 
   @override
-  String get openOfflineMode => 'Open in offline mode';
+  String get openOfflineMode => 'Ouvrir en mode hors connexion';
 
   @override
   String get appearanceSection => 'Appearance';

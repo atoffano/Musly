@@ -146,6 +146,3 @@ This project is open source and available under the **Creative Commons Attributi
 [![Views](https://komarev.com/ghpvc/?username=dddevid-Musly&label=VIEWS&color=fa243c&style=for-the-badge)](https://github.com/dddevid/Musly)
 
 </div>
-
-
-
