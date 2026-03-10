@@ -502,7 +502,7 @@
   "@systemDefault": {
     "description": "System default language option"
   },
-  "communityTranslations": "Traductions par la communauté",
+  "communityTranslations": "Traduction par la communauté",
   "@communityTranslations": {
     "description": "Community translations credit label"
   },
@@ -511,7 +511,7 @@
     "description": "Community translations credit subtitle"
   },
   "@_LIBRARY": {},
-  "yourLibrary": "Votre Bibliothèque",
+  "yourLibrary": "Ma Bibliothèque",
   "filterAll": "Tout",
   "filterPlaylists": "Playlists",
   "filterAlbums": "Albums",
@@ -571,6 +571,7 @@
   "noSuggestions": "Aucune suggestion",
   "browseCategories": "Parcourir les catégories",
   "liveSearchSection": "Rechercher",
+  "liveSearch": "Recherche en direct",
   "liveSearchSubtitle": "Mettre à jour les résultats lorsque vous écrivez au lieu d'afficher une liste déroulante",
   "categoryMadeForYou": "Fait pour vous",
   "categoryNewReleases": "Nouvelles sorties",
@@ -1481,17 +1482,189 @@
   "@openOfflineMode": {
     "description": "Button to enter offline mode from the server-unreachable screen"
   },
+  "appearanceSection": "Apparence",
+  "@appearanceSection": {
+    "description": "Display settings section header for theme / appearance"
+  },
+  "themeLabel": "Thème",
+  "@themeLabel": {
+    "description": "Label for the theme mode selector (System / Light / Dark)"
+  },
+  "accentColorLabel": "Couleur d'accentuation",
+  "@accentColorLabel": {
+    "description": "Label for the accent color picker"
+  },
+  "circularDesignLabel": "Design circulaire",
+  "@circularDesignLabel": {
+    "description": "Label for the Circular Design (glass-blur UI) toggle"
+  },
+  "circularDesignSubtitle": "Interface utilisateur flottante, arrondie avec des panneaux translucides et un effet \"verre flou\" sur le lecteur et la barre de navigation.",
+  "@circularDesignSubtitle": {
+    "description": "Subtitle describing the Circular Design visual style"
+  },
+  "themeModeSystem": "Système",
+  "@themeModeSystem": {
+    "description": "Theme mode option that follows the OS setting"
+  },
+  "themeModeLight": "Clair",
+  "@themeModeLight": {
+    "description": "Light theme mode option"
+  },
+  "themeModeDark": "Sombre",
+  "@themeModeDark": {
+    "description": "Dark theme mode option"
+  },
   "@internetRadio": {
     "description": "Subtitle shown in the mini player and player bar when a radio station is playing"
   },
+  "liveLabel": "EN DIRECT",
+  "@liveLabel": {
+    "description": "Badge shown next to a live radio stream"
+  },
+  "discordStatusText": "Texte de statut Discord",
+  "@discordStatusText": {
+    "description": "Settings label for the Discord Rich Presence second-line style"
+  },
+  "discordStatusTextSubtitle": "Deuxième ligne affichée dans l'activité Discord",
+  "@discordStatusTextSubtitle": {
+    "description": "Subtitle for the Discord status text setting"
+  },
+  "discordRpcStyleArtist": "Nom de l'artiste",
+  "@discordRpcStyleArtist": {
+    "description": "Discord RPC state style option: show artist name"
+  },
+  "discordRpcStyleSong": "Titre de la piste",
+  "@discordRpcStyleSong": {
+    "description": "Discord RPC state style option: show song title"
+  },
+  "discordRpcStyleApp": "Nom de l'application (Musly)",
+  "@discordRpcStyleApp": {
+    "description": "Discord RPC state style option: show app name"
+  },
   "@sectionAutoDj": {
     "description": "Playback settings section header for Auto DJ"
+  },
+  "sectionVolumeNormalization": "NORMALISATION DU VOLUME (REPLAYGAIN)",
+  "@sectionVolumeNormalization": {
+    "description": "Playback settings section header for ReplayGain"
   },
   "@sectionStreamingQuality": {
     "description": "Playback settings section header for transcoding / streaming quality"
   },
   "@replayGainMode": {
     "description": "Label for the ReplayGain mode selector"
+  },
+  "replayGainModeOff": "Désactivé",
+  "@replayGainModeOff": {
+    "description": "ReplayGain mode: disabled"
+  },
+  "replayGainModeTrack": "Piste",
+  "@replayGainModeTrack": {
+    "description": "ReplayGain mode: per-track normalization"
+  },
+  "replayGainModeAlbum": "Album",
+  "@replayGainModeAlbum": {
+    "description": "ReplayGain mode: album-level normalization"
+  },
+  "replayGainPreamp": "Pré-ampli : {value} dB",
+  "@replayGainPreamp": {
+    "description": "ReplayGain preamp slider label",
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "replayGainPreventClipping": "Empêcher le découpage audio",
+  "@replayGainPreventClipping": {
+    "description": "Toggle label for ReplayGain prevent-clipping option"
+  },
+  "replayGainFallbackGain": "Gain de repli : {value} dB",
+  "@replayGainFallbackGain": {
+    "description": "ReplayGain fallback gain slider label",
+    "placeholders": {
+      "value": {
+        "type": "String"
+      }
+    }
+  },
+  "autoDjSongsToAdd": "Pistes à ajouter : {count}",
+  "@autoDjSongsToAdd": {
+    "description": "Auto DJ slider label showing how many songs to add",
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "transcodingEnable": "Activer le transcodage",
+  "@transcodingEnable": {
+    "description": "Toggle label to enable transcoding"
+  },
+  "transcodingEnableSubtitle": "Réduire la consommation de données avec une qualité inférieure",
+  "@transcodingEnableSubtitle": {
+    "description": "Subtitle for the enable transcoding toggle"
+  },
+  "smartTranscoding": "Transcodage intelligent",
+  "@smartTranscoding": {
+    "description": "Toggle label for smart (auto) transcoding mode"
+  },
+  "smartTranscodingSubtitle": "Ajuste automatiquement la qualité en fonction de votre connexion (Wi-Fi vs données mobiles)",
+  "@smartTranscodingSubtitle": {
+    "description": "Subtitle for the smart transcoding toggle"
+  },
+  "smartTranscodingDetectedNetwork": "Réseau détecté : ",
+  "@smartTranscodingDetectedNetwork": {
+    "description": "Label shown before the live network type badge"
+  },
+  "smartTranscodingActiveBitrate": "Débit actif : {bitrate}",
+  "@smartTranscodingActiveBitrate": {
+    "description": "Shows the currently active transcoding bitrate",
+    "placeholders": {
+      "bitrate": {
+        "type": "String"
+      }
+    }
+  },
+  "transcodingWifiQuality": "Qualité sur réseau Wi-Fi",
+  "@transcodingWifiQuality": {
+    "description": "Label for WiFi bitrate selector"
+  },
+  "transcodingWifiQualitySubtitleSmart": "Utilisé automatiquement en Wi-Fi",
+  "@transcodingWifiQualitySubtitleSmart": {
+    "description": "WiFi quality subtitle when smart mode is on"
+  },
+  "transcodingWifiQualitySubtitle": "Débit binaire en Wi-Fi",
+  "@transcodingWifiQualitySubtitle": {
+    "description": "WiFi quality subtitle when smart mode is off"
+  },
+  "transcodingMobileQuality": "Qualité sur réseau mobile",
+  "@transcodingMobileQuality": {
+    "description": "Label for mobile data bitrate selector"
+  },
+  "transcodingMobileQualitySubtitleSmart": "Utilisé automatiquement sur les données mobiles",
+  "@transcodingMobileQualitySubtitleSmart": {
+    "description": "Mobile quality subtitle when smart mode is on"
+  },
+  "transcodingMobileQualitySubtitle": "Débit sur données mobiles",
+  "@transcodingMobileQualitySubtitle": {
+    "description": "Mobile quality subtitle when smart mode is off"
+  },
+  "transcodingFormat": "Format",
+  "@transcodingFormat": {
+    "description": "Label for the transcoding format selector"
+  },
+  "transcodingFormatSubtitle": "Codec audio utilisé pour la diffusion",
+  "@transcodingFormatSubtitle": {
+    "description": "Subtitle for the transcoding format selector"
+  },
+  "transcodingBitrateOriginal": "Original (sans transcodage)",
+  "@transcodingBitrateOriginal": {
+    "description": "Transcoding bitrate option: no transcoding, use original"
+  },
+  "transcodingFormatOriginal": "Original",
+  "@transcodingFormatOriginal": {
+    "description": "Transcoding format option: original (no conversion)"
   },
   "@sectionCacheSettings": {
     "description": "Storage settings section header"
@@ -1505,7 +1678,75 @@
   "@sectionBpmAnalysis": {
     "description": "Storage settings section header for BPM analysis"
   },
+  "imageCacheTitle": "Cache d'images",
+  "@imageCacheTitle": {
+    "description": "Toggle title for image (album art) cache"
+  },
+  "imageCacheSubtitle": "Enregistrer les pochettes d'album en local",
+  "@imageCacheSubtitle": {
+    "description": "Subtitle for image cache toggle"
+  },
+  "musicCacheTitle": "Cache de musiques",
+  "@musicCacheTitle": {
+    "description": "Toggle title for music metadata cache"
+  },
+  "musicCacheSubtitle": "Enregistrer les métadonnées de la piste en local",
+  "@musicCacheSubtitle": {
+    "description": "Subtitle for music cache toggle"
+  },
+  "bpmCacheTitle": "Cache BPM",
+  "@bpmCacheTitle": {
+    "description": "Toggle title for BPM analysis cache"
+  },
+  "bpmCacheSubtitle": "Enregistrer les analyses BPM en local",
+  "@bpmCacheSubtitle": {
+    "description": "Subtitle for BPM cache toggle"
+  },
   "@clearAllCache": {
     "description": "Button to clear all cached data"
+  },
+  "sectionAboutInformation": "INFORMATIONS",
+  "@sectionAboutInformation": {
+    "description": "About screen section header"
+  },
+  "sectionAboutDeveloper": "DÉVELOPPEUR",
+  "@sectionAboutDeveloper": {
+    "description": "About screen developer section header"
+  },
+  "sectionAboutLinks": "LIENS",
+  "@sectionAboutLinks": {
+    "description": "About screen links section header"
+  },
+  "aboutVersion": "Version",
+  "@aboutVersion": {
+    "description": "About screen version row title"
+  },
+  "aboutPlatform": "Plateforme",
+  "@aboutPlatform": {
+    "description": "About screen platform row title"
+  },
+  "aboutMadeBy": "Développé par dddevid",
+  "@aboutMadeBy": {
+    "description": "Developer credit text in the about tab"
+  },
+  "aboutGitHub": "github.com/dddevid",
+  "@aboutGitHub": {
+    "description": "Developer GitHub handle shown as subtitle"
+  },
+  "aboutLinkGitHub": "Dépôt GitHub",
+  "@aboutLinkGitHub": {
+    "description": "Link tile title for the GitHub repo"
+  },
+  "aboutLinkChangelog": "Journal des modifications",
+  "@aboutLinkChangelog": {
+    "description": "Link tile title for the app changelog"
+  },
+  "aboutLinkReportIssue": "Signaler un problème",
+  "@aboutLinkReportIssue": {
+    "description": "Link tile title for reporting a bug"
+  },
+  "aboutLinkDiscord": "Rejoignez la communauté Discord",
+  "@aboutLinkDiscord": {
+    "description": "Link tile title for the Discord server"
   }
 }
