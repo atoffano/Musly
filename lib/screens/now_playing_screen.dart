@@ -125,7 +125,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       _horizontalDragOffset += details.delta.dx;
       _updatePreviewSong();
     });
-    if (_swipeProgress >= 1.0 && !_hasTriggeredHaptic) {
+    if (_previewSong != null && _swipeProgress >= 1.0 && !_hasTriggeredHaptic) {
       _hasTriggeredHaptic = true;
       HapticFeedback.lightImpact();
     }
@@ -138,16 +138,22 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     final velocity = details.primaryVelocity ?? 0;
     final provider = context.read<PlayerProvider>();
 
-    final shouldSkipNext = (_horizontalDragOffset < -_swipeThreshold ||
+    final shouldSkipNext =
+        (_horizontalDragOffset < -_swipeThreshold ||
             velocity < -_swipeVelocityThreshold) &&
         provider.hasNext;
-    final shouldSkipPrevious = (_horizontalDragOffset > _swipeThreshold ||
+    final shouldSkipPrevious =
+        (_horizontalDragOffset > _swipeThreshold ||
             velocity > _swipeVelocityThreshold) &&
         provider.hasPrevious;
 
     if (shouldSkipNext || shouldSkipPrevious) {
+      final targetIndex = shouldSkipNext
+          ? provider.currentIndex + 1
+          : provider.currentIndex - 1;
       _animateSwipeCompletion(
         goNext: shouldSkipNext,
+        targetIndex: targetIndex,
         provider: provider,
         flingVelocity: velocity.abs(),
       );
@@ -158,6 +164,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
 
   void _animateSwipeCompletion({
     required bool goNext,
+    required int targetIndex,
     required PlayerProvider provider,
     required double flingVelocity,
   }) {
@@ -174,13 +181,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
 
     _swipeAnimationController.duration = Duration(milliseconds: durationMs);
     _swipeAnimationController.reset();
-    final animation = Tween<double>(
-      begin: startOffset,
-      end: endOffset,
-    ).animate(CurvedAnimation(
-      parent: _swipeAnimationController,
-      curve: Curves.easeOut,
-    ));
+    final animation = Tween<double>(begin: startOffset, end: endOffset).animate(
+      CurvedAnimation(parent: _swipeAnimationController, curve: Curves.easeOut),
+    );
 
     void listener() {
       if (!mounted) return;
@@ -199,11 +202,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         _previewSong = null;
         _isSwipeAnimating = false;
       });
-      if (goNext) {
-        provider.skipNext();
-      } else {
-        provider.skipPrevious();
-      }
+      provider.skipToIndex(targetIndex);
     });
   }
 
@@ -217,13 +216,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
 
     _swipeAnimationController.duration = Duration(milliseconds: durationMs);
     _swipeAnimationController.reset();
-    final animation = Tween<double>(
-      begin: startOffset,
-      end: 0.0,
-    ).animate(CurvedAnimation(
-      parent: _swipeAnimationController,
-      curve: Curves.easeOutQuad,
-    ));
+    final animation = Tween<double>(begin: startOffset, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _swipeAnimationController,
+        curve: Curves.easeOutQuad,
+      ),
+    );
 
     void listener() {
       if (!mounted) return;
@@ -304,11 +302,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
               duration: animDuration,
               curve: animCurve,
               transform: Matrix4.identity()
-                ..setTranslationRaw(
-                  0.0,
-                  -_morphProgress * 10,
-                  0.0,
-                )
+                ..setTranslationRaw(0.0, -_morphProgress * 10, 0.0)
                 ..scaleByDouble(
                   1.0 + _morphProgress * 0.03,
                   1.0 + _morphProgress * 0.03,
@@ -320,6 +314,7 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                 currentImageUrl: _cachedImageUrl ?? '',
                 currentThumbnailUrl: _cachedThumbnailUrl,
                 previewImageUrl: _getPreviewArtworkUrl(_previewSong),
+                hasPreviewSong: _previewSong != null,
                 size: artworkSize,
                 swipeProgress: _swipeProgress,
                 horizontalDragOffset: _horizontalDragOffset,
@@ -607,9 +602,12 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
                                                 _getPreviewArtworkUrl(
                                                   _previewSong,
                                                 ),
+                                            hasPreviewSong:
+                                                _previewSong != null,
                                             size: artworkSize,
                                             swipeProgress: _swipeProgress,
-                                            horizontalDragOffset: _horizontalDragOffset,
+                                            horizontalDragOffset:
+                                                _horizontalDragOffset,
                                           ),
                                         ),
 
@@ -680,7 +678,8 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
   }
 
   Widget _buildRadioPlayer(BuildContext context, RadioStation station) {
-    final animDuration = (_isDragging || _isHorizontalDragging || _isSwipeAnimating)
+    final animDuration =
+        (_isDragging || _isHorizontalDragging || _isSwipeAnimating)
         ? Duration.zero
         : const Duration(milliseconds: 300);
     final animCurve = Curves.easeOutCubic;
@@ -1371,6 +1370,7 @@ class _SwipeableAlbumArtwork extends StatelessWidget {
   final String currentImageUrl;
   final String? currentThumbnailUrl;
   final String? previewImageUrl;
+  final bool hasPreviewSong;
   final double size;
   final double swipeProgress;
   final double horizontalDragOffset;
@@ -1379,6 +1379,7 @@ class _SwipeableAlbumArtwork extends StatelessWidget {
     required this.currentImageUrl,
     this.currentThumbnailUrl,
     this.previewImageUrl,
+    this.hasPreviewSong = false,
     required this.size,
     required this.swipeProgress,
     required this.horizontalDragOffset,
@@ -1386,9 +1387,7 @@ class _SwipeableAlbumArtwork extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasPreview = previewImageUrl != null &&
-        previewImageUrl!.isNotEmpty &&
-        horizontalDragOffset != 0;
+    final hasPreview = hasPreviewSong && horizontalDragOffset != 0;
 
     final isSwipingRight = horizontalDragOffset > 0;
     final previewStart = isSwipingRight
@@ -1406,7 +1405,10 @@ class _SwipeableAlbumArtwork extends StatelessWidget {
 
     // Fade based on distance from center
     final totalDistance = size + _kCarouselGap;
-    final progress = (horizontalDragOffset.abs() / totalDistance).clamp(0.0, 1.0);
+    final progress = (horizontalDragOffset.abs() / totalDistance).clamp(
+      0.0,
+      1.0,
+    );
     final currentOpacity = (1.0 - progress * 0.5).clamp(0.5, 1.0);
     final previewOpacity = (progress * 0.5 + 0.5).clamp(0.5, 1.0);
 
@@ -1437,6 +1439,8 @@ class _SwipeableAlbumArtwork extends StatelessWidget {
   }
 
   Widget _buildPreviewArtwork(BuildContext context) {
+    final hasArtwork = previewImageUrl != null && previewImageUrl!.isNotEmpty;
+
     return Container(
       width: size,
       height: size,
@@ -1452,7 +1456,9 @@ class _SwipeableAlbumArtwork extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(12),
-        child: isLocalFilePath(previewImageUrl)
+        child: !hasArtwork
+            ? _buildNoArtPlaceholder(context)
+            : isLocalFilePath(previewImageUrl)
             ? Image.file(
                 File(previewImageUrl!),
                 key: ValueKey(previewImageUrl),
@@ -1470,8 +1476,8 @@ class _SwipeableAlbumArtwork extends StatelessWidget {
                 useOldImageOnUrlChange: true,
                 fadeInDuration: Duration.zero,
                 fadeOutDuration: Duration.zero,
-                placeholder: (_, __) => _buildPlaceholder(),
-                errorWidget: (_, __, ___) => _buildNoArtPlaceholder(context),
+                placeholder: (_, _) => _buildPlaceholder(),
+                errorWidget: (_, _, _) => _buildNoArtPlaceholder(context),
               ),
       ),
     );
