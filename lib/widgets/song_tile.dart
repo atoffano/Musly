@@ -13,6 +13,7 @@ import '../providers/auth_provider.dart';
 import '../theme/app_theme.dart';
 import 'album_artwork.dart';
 import 'animated_equalizer.dart';
+import 'multi_artist_widget.dart';
 import '../screens/album_screen.dart';
 import '../screens/artist_screen.dart';
 
@@ -67,12 +68,7 @@ class SongTile extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
           subtitle: showArtist || showAlbum
-              ? Text(
-                  _buildSubtitle(),
-                  style: theme.textTheme.bodySmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                )
+              ? _buildSubtitleWidget(theme)
               : null,
           trailing: _buildTrailing(context),
           onTap: onTap ?? () => _playSong(context),
@@ -139,15 +135,22 @@ class SongTile extends StatelessWidget {
     return null;
   }
 
-  String _buildSubtitle() {
-    final parts = <String>[];
-    if (showArtist && song.artist != null) {
-      parts.add(song.artist!);
+  Widget _buildSubtitleWidget(ThemeData theme) {
+    if (showArtist) {
+      return MultiArtistWidget(
+        artists: song.artistParticipants,
+        artistFallback: song.artist,
+        artistIdFallback: song.artistId,
+        style: theme.textTheme.bodySmall,
+      );
     }
-    if (showAlbum && song.album != null) {
-      parts.add(song.album!);
-    }
-    return parts.join(' • ');
+
+    return Text(
+      song.album ?? '',
+      style: theme.textTheme.bodySmall,
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
   }
 
   Widget _buildTrailing(BuildContext context) {
