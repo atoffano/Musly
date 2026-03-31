@@ -9,6 +9,7 @@ import '../theme/app_theme.dart';
 import '../widgets/widgets.dart';
 import 'artist_screen.dart';
 import '../l10n/app_localizations.dart';
+import '../services/offline_service.dart';
 
 class AlbumScreen extends StatefulWidget {
   final String albumId;
@@ -23,6 +24,7 @@ class _AlbumScreenState extends State<AlbumScreen> {
   Album? _album;
   List<Song> _songs = [];
   bool _isLoading = true;
+  bool _isDownloading = false;
 
   @override
   void initState() {
@@ -79,6 +81,42 @@ class _AlbumScreenState extends State<AlbumScreen> {
     }
 
     playerProvider.playSong(playlist.first, playlist: playlist, startIndex: 0);
+  }
+
+  Future<void> _downloadAlbum() async {
+    if (_songs.isEmpty) return;
+
+    final subsonicService = Provider.of<SubsonicService>(
+      context,
+      listen: false,
+    );
+    final offlineService = OfflineService();
+    await offlineService.initialize();
+
+    setState(() => _isDownloading = true);
+
+    offlineService.startBackgroundDownload(_songs, subsonicService).then((_) {
+      if (mounted) {
+        setState(() => _isDownloading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Downloaded ${_songs.length} songs from ${_album!.name}',
+            ),
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Downloading ${_songs.length} songs in background…'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   @override
@@ -160,6 +198,10 @@ class _AlbumScreenState extends State<AlbumScreen> {
     final hours = totalDuration ~/ 3600;
     final minutes = (totalDuration % 3600) ~/ 60;
 
+    final isOffline =
+        Provider.of<AuthProvider>(context, listen: false).state ==
+        AuthState.offlineMode;
+
     return Scaffold(
       body: Stack(
         children: [
@@ -205,6 +247,20 @@ class _AlbumScreenState extends State<AlbumScreen> {
                     ],
                   ),
                 ),
+                actions: [
+                  if (!isOffline)
+                    IconButton(
+                      tooltip: 'Download album',
+                      onPressed: _isDownloading ? null : _downloadAlbum,
+                      icon: _isDownloading
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(CupertinoIcons.cloud_download),
+                    ),
+                ],
               ),
               SliverToBoxAdapter(
                 child: Padding(
