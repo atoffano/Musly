@@ -20,6 +20,10 @@ class Song {
   final bool? starred;
   final int? userRating; 
   final bool isLocal;
+  final String? sourceType;
+  final String? sourceId;
+  final String? streamUrl;
+  final bool saved;
   final double? replayGainTrackGain;
   final double? replayGainAlbumGain;
   final double? replayGainTrackPeak;
@@ -46,6 +50,10 @@ class Song {
     this.starred,
     this.userRating,
     this.isLocal = false,
+    this.sourceType,
+    this.sourceId,
+    this.streamUrl,
+    this.saved = false,
     this.replayGainTrackGain,
     this.replayGainAlbumGain,
     this.replayGainTrackPeak,
@@ -76,6 +84,10 @@ class Song {
       starred: json['starred'] != null ? true : false,
       userRating: json['userRating'] as int?,
       isLocal: json['isLocal'] as bool? ?? false,
+      sourceType: json['sourceType']?.toString(),
+      sourceId: json['sourceId']?.toString(),
+      streamUrl: json['streamUrl']?.toString(),
+      saved: json['saved'] as bool? ?? false,
       replayGainTrackGain: (replayGain?['trackGain'] as num?)?.toDouble(),
       replayGainAlbumGain: (replayGain?['albumGain'] as num?)?.toDouble(),
       replayGainTrackPeak: (replayGain?['trackPeak'] as num?)?.toDouble(),
@@ -103,6 +115,10 @@ class Song {
       'size': size,
       'path': path,
       'isLocal': isLocal,
+      'sourceType': sourceType,
+      'sourceId': sourceId,
+      'streamUrl': streamUrl,
+      'saved': saved,
       'replayGain': {
         if (replayGainTrackGain != null) 'trackGain': replayGainTrackGain,
         if (replayGainAlbumGain != null) 'albumGain': replayGainAlbumGain,
@@ -141,6 +157,10 @@ class Song {
     bool? starred,
     int? userRating,
     bool? isLocal,
+    String? sourceType,
+    String? sourceId,
+    String? streamUrl,
+    bool? saved,
     double? replayGainTrackGain,
     double? replayGainAlbumGain,
     double? replayGainTrackPeak,
@@ -167,6 +187,10 @@ class Song {
       starred: starred ?? this.starred,
       userRating: userRating ?? this.userRating,
       isLocal: isLocal ?? this.isLocal,
+      sourceType: sourceType ?? this.sourceType,
+      sourceId: sourceId ?? this.sourceId,
+      streamUrl: streamUrl ?? this.streamUrl,
+      saved: saved ?? this.saved,
       replayGainTrackGain: replayGainTrackGain ?? this.replayGainTrackGain,
       replayGainAlbumGain: replayGainAlbumGain ?? this.replayGainAlbumGain,
       replayGainTrackPeak: replayGainTrackPeak ?? this.replayGainTrackPeak,
@@ -174,4 +198,6 @@ class Song {
       artistParticipants: artistParticipants ?? this.artistParticipants,
     );
   }
+
+  bool get isYouTube => sourceType == 'youtube' || id.startsWith('yt:');
 }

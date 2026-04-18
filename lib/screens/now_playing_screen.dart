@@ -1883,6 +1883,7 @@ class _SongInfoState extends State<_SongInfo> {
   @override
   Widget build(BuildContext context) {
     if (widget.song == null) return const SizedBox.shrink();
+    final song = widget.song!;
 
     return Row(
       children: [
@@ -1891,7 +1892,7 @@ class _SongInfoState extends State<_SongInfo> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                widget.song!.title,
+                song.title,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 22,
@@ -1902,9 +1903,9 @@ class _SongInfoState extends State<_SongInfo> {
               ),
               const SizedBox(height: 4),
               MultiArtistWidget(
-                artists: widget.song!.artistParticipants,
-                artistFallback: widget.song!.artist,
-                artistIdFallback: widget.song!.artistId,
+                artists: song.artistParticipants,
+                artistFallback: song.artist,
+                artistIdFallback: song.artistId,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.7),
                   fontSize: 18,
@@ -1924,6 +1925,29 @@ class _SongInfoState extends State<_SongInfo> {
             size: 26,
           ),
         ),
+        if (song.isYouTube)
+          Selector<PlayerProvider, ({bool saved, bool busy})>(
+            selector: (_, provider) => (
+              saved: provider.isYouTubeSaved(song),
+              busy: provider.isYouTubeSaveBusy(song),
+            ),
+            builder: (context, state, _) {
+              return IconButton(
+                onPressed: state.busy ? null : () => _toggleYouTubeSaved(context),
+                icon: state.busy
+                    ? const SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Icon(
+                        state.saved ? CupertinoIcons.check_mark_circled_solid : CupertinoIcons.plus_circle,
+                        color: state.saved ? const Color(0xFF66BB6A) : Colors.white,
+                        size: 26,
+                      ),
+              );
+            },
+          ),
         IconButton(
           onPressed: () => _toggleFavorite(context),
           icon: Icon(
@@ -1934,6 +1958,31 @@ class _SongInfoState extends State<_SongInfo> {
         ),
       ],
     );
+  }
+
+  Future<void> _toggleYouTubeSaved(BuildContext context) async {
+    if (widget.song == null) return;
+
+    final player = context.read<PlayerProvider>();
+    try {
+      await player.toggleYouTubeSaved(widget.song!);
+      if (!context.mounted) return;
+      final saved = player.isYouTubeSaved(widget.song!);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(saved ? 'Saving to library started' : 'Removed from library'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Save action failed: $e'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Future<void> _toggleFavorite(BuildContext context) async {

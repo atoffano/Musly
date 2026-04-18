@@ -1,4 +1,5 @@
 export 'subsonic_service.dart';
+export 'musly_backend_service.dart';
 export 'storage_service.dart';
 export 'android_auto_service.dart';
 export 'android_system_service.dart';

@@ -8,6 +8,7 @@ import '../services/local_music_service.dart';
 
 class LibraryProvider extends ChangeNotifier {
   final SubsonicService _subsonicService;
+  final MuslyBackendService _muslyBackendService;
   final AndroidAutoService _androidAutoService = AndroidAutoService();
 
   bool _localOnlyMode = false;
@@ -40,7 +41,8 @@ class LibraryProvider extends ChangeNotifier {
   static const String _artistsCacheKey = 'cached_artists';
   static const String _lastUpdateKey = 'last_cache_update';
 
-  LibraryProvider(this._subsonicService);
+  LibraryProvider(this._subsonicService, {MuslyBackendService? muslyBackendService})
+      : _muslyBackendService = muslyBackendService ?? MuslyBackendService();
   SubsonicService get subsonicService => _subsonicService;
 
   void setLocalMusicService(LocalMusicService service) {
@@ -681,7 +683,51 @@ class LibraryProvider extends ChangeNotifier {
     if (_localOnlyMode) {
       return _searchLocal(query);
     }
-    return await _subsonicService.search(query);
+
+    final subsonicResult = await _subsonicService.search(query);
+    final bridgeUrl = _bridgeBaseUrl();
+    if (bridgeUrl == null) {
+      return subsonicResult;
+    }
+
+    try {
+      final ytResult = await _muslyBackendService.searchSongs(bridgeUrl, query);
+      final mergedSongs = <Song>[];
+      final seen = <String>{};
+
+      for (final song in subsonicResult.songs) {
+        if (seen.add(song.id)) {
+          mergedSongs.add(song);
+        }
+      }
+
+      for (final song in ytResult.songs) {
+        if (seen.add(song.id)) {
+          mergedSongs.add(song);
+        }
+      }
+
+      return SearchResult(
+        artists: subsonicResult.artists,
+        albums: subsonicResult.albums,
+        songs: mergedSongs,
+      );
+    } catch (e) {
+      debugPrint('YouTube bridge search failed: $e');
+      return subsonicResult;
+    }
+  }
+
+  String? _bridgeBaseUrl() {
+    final config = _subsonicService.config;
+    if (config == null || config.serverUrl.isEmpty) {
+      return null;
+    }
+    final uri = Uri.tryParse(config.serverUrl);
+    if (uri == null || uri.host.isEmpty) {
+      return null;
+    }
+    return '${uri.scheme}://${uri.host}:8788';
   }
 
   SearchResult _searchLocal(String query) {
@@ -730,6 +776,36 @@ class LibraryProvider extends ChangeNotifier {
       artistId: artistId,
     );
     await loadStarred();
+  }
+
+  void updateYouTubeSavedState(String sourceId, bool saved) {
+    bool changed = false;
+
+    Song patch(Song song) {
+      final songSourceId = song.sourceId ?? (song.id.startsWith('yt:') ? song.id.substring(3) : null);
+      if (songSourceId != sourceId) {
+        return song;
+      }
+      if (song.saved == saved) {
+        return song;
+      }
+      changed = true;
+      return song.copyWith(saved: saved);
+    }
+
+    _cachedAllSongs = _cachedAllSongs.map(patch).toList();
+    _randomSongs = _randomSongs.map(patch).toList();
+    _starred = _starred == null
+        ? null
+        : SearchResult(
+            artists: _starred!.artists,
+            albums: _starred!.albums,
+            songs: _starred!.songs.map(patch).toList(),
+          );
+
+    if (changed) {
+      notifyListeners();
+    }
   }
 
   Future<List<Song>> getSongsByGenre(String genre) async {

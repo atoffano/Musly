@@ -300,6 +300,39 @@ class _DesktopPlayerBarState extends State<DesktopPlayerBar> {
                     );
                   },
                 ),
+                if (currentSong.isYouTube)
+                  Selector<PlayerProvider, ({bool saved, bool busy})>(
+                    selector: (_, p) => (
+                      saved: p.isYouTubeSaved(currentSong),
+                      busy: p.isYouTubeSaveBusy(currentSong),
+                    ),
+                    builder: (context, state, _) {
+                      return IconButton(
+                        onPressed: state.busy
+                            ? null
+                            : () async {
+                                final provider = context.read<PlayerProvider>();
+                                try {
+                                  await provider.toggleYouTubeSaved(currentSong);
+                                } catch (_) {}
+                              },
+                        icon: state.busy
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : Icon(
+                                state.saved ? Icons.check_circle : Icons.add_circle_outline,
+                                size: 20,
+                                color: state.saved
+                                    ? Colors.green
+                                    : (isDark ? const Color(0xFFB3B3B3) : const Color(0xFF6B6B6B)),
+                              ),
+                        tooltip: state.saved ? 'Remove from Library' : 'Add to Library',
+                      );
+                    },
+                  ),
               ],
             ),
           ),

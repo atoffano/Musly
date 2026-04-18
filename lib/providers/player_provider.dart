@@ -18,6 +18,7 @@ import '../services/replay_gain_service.dart';
 import '../services/auto_dj_service.dart';
 import '../services/discord_rpc_service.dart';
 import '../services/storage_service.dart';
+import '../services/musly_backend_service.dart';
 import '../services/cast_service.dart';
 import '../services/upnp_service.dart';
 import '../services/audio_handler.dart';
@@ -25,8 +26,11 @@ import '../providers/library_provider.dart';
 
 enum RepeatMode { off, all, one }
 
+enum YouTubeSaveState { idle, saving, polling, ready, error }
+
 class PlayerProvider extends ChangeNotifier {
   final SubsonicService _subsonicService;
+  final MuslyBackendService _muslyBackendService;
   late final StorageService _storageService;
   final MuslyAudioHandler _audioHandler;
   // Convenience getter — use this everywhere just_audio is accessed directly.
@@ -72,6 +76,11 @@ class PlayerProvider extends ChangeNotifier {
   Timer? _sleepTimerFadeTimer;
 
   double _playbackSpeed = 1.0;
+  final Map<String, bool> _youtubeSavedOverrides = {};
+  final Map<String, YouTubeSaveState> _youtubeSaveStates = {};
+  final Map<String, String> _youtubeSaveErrors = {};
+  final Set<String> _youtubeSaveLocks = {};
+  final Map<String, Timer> _youtubePollingTimers = {};
 
   PlayerProvider(
     this._subsonicService,
@@ -79,7 +88,9 @@ class PlayerProvider extends ChangeNotifier {
     this._castService,
     this._upnpService,
     this._audioHandler,
+    {MuslyBackendService? muslyBackendService}
   ) {
+    _muslyBackendService = muslyBackendService ?? MuslyBackendService();
     _storageService = storageService;
     _discordRpcService = DiscordRpcService(storageService);
     _castService.addListener(_onCastStateChanged);
@@ -692,6 +703,99 @@ class PlayerProvider extends ChangeNotifier {
 
   double get playbackSpeed => _playbackSpeed;
 
+  bool isYouTubeSaveBusy(Song song) {
+    final key = _youtubeKey(song);
+    if (key == null) {
+      return false;
+    }
+    return _youtubeSaveLocks.contains(key);
+  }
+
+  bool isYouTubeSaved(Song song) {
+    final key = _youtubeKey(song);
+    if (key == null) {
+      return song.saved;
+    }
+    return _youtubeSavedOverrides[key] ?? song.saved;
+  }
+
+  YouTubeSaveState youtubeSaveState(Song song) {
+    final key = _youtubeKey(song);
+    if (key == null) {
+      return YouTubeSaveState.idle;
+    }
+    return _youtubeSaveStates[key] ?? YouTubeSaveState.idle;
+  }
+
+  String? youtubeSaveError(Song song) {
+    final key = _youtubeKey(song);
+    if (key == null) {
+      return null;
+    }
+    return _youtubeSaveErrors[key];
+  }
+
+  Future<void> toggleYouTubeSaved(Song song) async {
+    if (!song.isYouTube) {
+      return;
+    }
+
+    final bridgeUrl = _bridgeBaseUrl();
+    if (bridgeUrl == null) {
+      throw Exception('Bridge URL unavailable for YouTube save action');
+    }
+
+    final key = _youtubeKey(song);
+    if (key == null || key.isEmpty) {
+      throw Exception('Missing YouTube source id');
+    }
+
+    if (_youtubeSaveLocks.contains(key)) {
+      return;
+    }
+
+    _youtubeSaveLocks.add(key);
+    _youtubeSaveErrors.remove(key);
+
+    final wasSaved = _youtubeSavedOverrides[key] ?? song.saved;
+    final targetSaved = !wasSaved;
+    _youtubeSavedOverrides[key] = targetSaved;
+    _youtubeSaveStates[key] = YouTubeSaveState.saving;
+    _syncCurrentSongYoutubeState(song, targetSaved);
+    notifyListeners();
+
+    try {
+      if (targetSaved) {
+        final result = await _muslyBackendService.saveSong(
+          bridgeUrl,
+          videoId: key,
+          title: song.title,
+          artist: song.artist,
+          album: song.album,
+        );
+        _youtubeSaveStates[key] = YouTubeSaveState.polling;
+        notifyListeners();
+        _startYouTubeSavePolling(song, key, result.jobId, targetSaved, wasSaved);
+      } else {
+        final removed = await _muslyBackendService.deleteSong(bridgeUrl, key);
+        if (!removed) {
+          throw Exception('Song is not currently saved in the bridge state');
+        }
+        _youtubeSaveStates[key] = YouTubeSaveState.ready;
+        _libraryProvider?.updateYouTubeSavedState(key, false);
+        _finishYouTubeSaveAction(key);
+      }
+    } catch (e) {
+      _youtubeSavedOverrides[key] = wasSaved;
+      _syncCurrentSongYoutubeState(song, wasSaved);
+      _youtubeSaveStates[key] = YouTubeSaveState.error;
+      _youtubeSaveErrors[key] = e.toString();
+      _youtubeSaveLocks.remove(key);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   Future<void> setPlaybackSpeed(double speed) async {
     _playbackSpeed = speed.clamp(0.25, 4.0);
     await _audioPlayer.setSpeed(_playbackSpeed);
@@ -944,9 +1048,7 @@ class PlayerProvider extends ChangeNotifier {
       if (_castService.isConnected) {
         if (_audioPlayer.playing) await _audioPlayer.stop();
 
-        final playUrl = song.isLocal == true
-            ? Uri.file(song.path!).toString()
-            : _subsonicService.getStreamUrl(song.id);
+        final playUrl = await _resolvePlayableUrl(song);
         final coverUrl = song.isLocal == true && song.coverArt != null
             ? song.coverArt!
             : _subsonicService.getCoverArtUrl(song.coverArt ?? song.id);
@@ -971,9 +1073,7 @@ class PlayerProvider extends ChangeNotifier {
         );
         if (_audioPlayer.playing) await _audioPlayer.stop();
 
-        final playUrl = song.isLocal == true && song.path != null
-            ? Uri.file(song.path!).toString()
-            : _subsonicService.getStreamUrl(song.id);
+        final playUrl = await _resolvePlayableUrl(song);
 
         try {
           final success = await _upnpService.loadAndPlay(
@@ -999,13 +1099,7 @@ class PlayerProvider extends ChangeNotifier {
         }
         _isPlaying = true;
       } else {
-        
-        final String playUrl;
-        if (song.isLocal == true && song.path != null) {
-          playUrl = Uri.file(song.path!).toString();
-        } else {
-          playUrl = _offlineService.getPlayableUrl(song, _subsonicService);
-        }
+        final playUrl = await _resolvePlayableUrl(song);
 
         try {
           await _audioPlayer.setUrl(playUrl);
@@ -1059,6 +1153,43 @@ class PlayerProvider extends ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  Future<String> _resolvePlayableUrl(Song song) async {
+    if (song.isLocal == true && song.path != null) {
+      return Uri.file(song.path!).toString();
+    }
+
+    if (song.isYouTube) {
+      final sourceId = song.sourceId ?? (song.id.startsWith('yt:') ? song.id.substring(3) : null);
+      if (sourceId == null || sourceId.isEmpty) {
+        throw Exception('Missing YouTube source id for playback');
+      }
+
+      if (song.streamUrl != null && song.streamUrl!.isNotEmpty) {
+        return song.streamUrl!;
+      }
+
+      final bridgeUrl = _bridgeBaseUrl();
+      if (bridgeUrl == null) {
+        throw Exception('Bridge URL unavailable for YouTube playback');
+      }
+      return await _muslyBackendService.resolveStreamUrl(bridgeUrl, sourceId);
+    }
+
+    return _offlineService.getPlayableUrl(song, _subsonicService);
+  }
+
+  String? _bridgeBaseUrl() {
+    final config = _subsonicService.config;
+    if (config == null || config.serverUrl.isEmpty) {
+      return null;
+    }
+    final uri = Uri.tryParse(config.serverUrl);
+    if (uri == null || uri.host.isEmpty) {
+      return null;
+    }
+    return '${uri.scheme}://${uri.host}:8788';
   }
 
   Future<void> playRadioStation(RadioStation station) async {
@@ -1460,6 +1591,103 @@ class PlayerProvider extends ChangeNotifier {
     }
   }
 
+  String? _youtubeKey(Song song) {
+    final sourceId = song.sourceId ?? (song.id.startsWith('yt:') ? song.id.substring(3) : null);
+    if (sourceId == null || sourceId.isEmpty) {
+      return null;
+    }
+    return sourceId;
+  }
+
+  void _startYouTubeSavePolling(
+    Song song,
+    String key,
+    String jobId,
+    bool targetSaved,
+    bool rollbackSaved,
+  ) {
+    _youtubePollingTimers[key]?.cancel();
+    var attempts = 0;
+    const maxAttempts = 30;
+    final bridgeUrl = _bridgeBaseUrl();
+    if (bridgeUrl == null) {
+      _youtubeSavedOverrides[key] = rollbackSaved;
+      _syncCurrentSongYoutubeState(song, rollbackSaved);
+      _youtubeSaveStates[key] = YouTubeSaveState.error;
+      _youtubeSaveErrors[key] = 'Bridge URL unavailable while polling';
+      _youtubeSaveLocks.remove(key);
+      notifyListeners();
+      return;
+    }
+
+    _youtubePollingTimers[key] = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      attempts += 1;
+      try {
+        final snapshot = await _muslyBackendService.getJobStatus(bridgeUrl, jobId);
+        final status = snapshot.status.toLowerCase();
+
+        if (status == 'ready') {
+          timer.cancel();
+          _youtubeSaveStates[key] = YouTubeSaveState.ready;
+          _youtubeSavedOverrides[key] = targetSaved;
+          _syncCurrentSongYoutubeState(song, targetSaved);
+          _libraryProvider?.updateYouTubeSavedState(key, targetSaved);
+          _finishYouTubeSaveAction(key);
+          return;
+        }
+
+        if (status == 'failed') {
+          timer.cancel();
+          _youtubeSavedOverrides[key] = rollbackSaved;
+          _syncCurrentSongYoutubeState(song, rollbackSaved);
+          _youtubeSaveStates[key] = YouTubeSaveState.error;
+          _youtubeSaveErrors[key] = snapshot.errorMessage ?? 'Bridge save job failed';
+          _youtubeSaveLocks.remove(key);
+          notifyListeners();
+          return;
+        }
+
+        if (attempts >= maxAttempts) {
+          timer.cancel();
+          _youtubeSavedOverrides[key] = rollbackSaved;
+          _syncCurrentSongYoutubeState(song, rollbackSaved);
+          _youtubeSaveStates[key] = YouTubeSaveState.error;
+          _youtubeSaveErrors[key] = 'Save job timed out after 30 seconds';
+          _youtubeSaveLocks.remove(key);
+          notifyListeners();
+        }
+      } catch (e) {
+        if (attempts >= maxAttempts) {
+          timer.cancel();
+          _youtubeSavedOverrides[key] = rollbackSaved;
+          _syncCurrentSongYoutubeState(song, rollbackSaved);
+          _youtubeSaveStates[key] = YouTubeSaveState.error;
+          _youtubeSaveErrors[key] = e.toString();
+          _youtubeSaveLocks.remove(key);
+          notifyListeners();
+        }
+      }
+    });
+  }
+
+  void _finishYouTubeSaveAction(String key) {
+    _youtubePollingTimers.remove(key)?.cancel();
+    _youtubeSaveLocks.remove(key);
+    notifyListeners();
+  }
+
+  void _syncCurrentSongYoutubeState(Song sourceSong, bool saved) {
+    final current = _currentSong;
+    if (current == null || !current.isYouTube) {
+      return;
+    }
+    final currentKey = _youtubeKey(current);
+    final sourceKey = _youtubeKey(sourceSong);
+    if (currentKey != null && currentKey == sourceKey) {
+      _currentSong = current.copyWith(saved: saved);
+    }
+  }
+
   Future<void> setRating(String songId, int rating) async {
     if (_currentSong?.id != songId) return;
 
@@ -1498,6 +1726,10 @@ class PlayerProvider extends ChangeNotifier {
     _sleepTimerFadeTimer?.cancel();
     _castService.removeListener(_onCastStateChanged);
     _upnpService.removeListener(_onUpnpStateChanged);
+    for (final timer in _youtubePollingTimers.values) {
+      timer.cancel();
+    }
+    _youtubePollingTimers.clear();
     _audioHandler.customAction('dispose');
     _androidAutoService.dispose();
     _androidSystemService.dispose();

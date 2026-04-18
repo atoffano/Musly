@@ -185,7 +185,33 @@ class SongTile extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (song.starred == true)
+        if (song.isYouTube)
+          Selector<PlayerProvider, ({bool saved, bool busy})>(
+            selector: (_, provider) => (
+              saved: provider.isYouTubeSaved(song),
+              busy: provider.isYouTubeSaveBusy(song),
+            ),
+            builder: (context, state, _) {
+              if (!state.saved && !state.busy) {
+                return const SizedBox.shrink();
+              }
+              return Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: state.busy
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(
+                        Icons.check_circle,
+                        size: 14,
+                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.85),
+                      ),
+              );
+            },
+          )
+        else if (song.starred == true)
           Padding(
             padding: const EdgeInsets.only(right: 4),
             child: Icon(
@@ -312,21 +338,47 @@ class _SongOptionsSheetState extends State<_SongOptionsSheet> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    _OptionTile(
-                      icon: _isStarred
-                          ? CupertinoIcons.heart_fill
-                          : CupertinoIcons.heart,
-                      title: _isStarred
-                          ? 'Remove from Liked Songs'
-                          : 'Add to Liked Songs',
-                      iconColor: _isStarred ? Theme.of(context).colorScheme.primary : null,
-                      onTap: () async {
-                        await _toggleFavorite(context);
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                        }
-                      },
-                    ),
+                    if (widget.song.isYouTube)
+                      Selector<PlayerProvider, ({bool saved, bool busy})>(
+                        selector: (_, provider) => (
+                          saved: provider.isYouTubeSaved(widget.song),
+                          busy: provider.isYouTubeSaveBusy(widget.song),
+                        ),
+                        builder: (context, state, _) {
+                          return _OptionTile(
+                            icon: state.saved ? Icons.check_circle : Icons.add_circle_outline,
+                            title: state.saved ? 'Remove from Library' : 'Add to Library',
+                            iconColor: state.saved ? Theme.of(context).colorScheme.primary : null,
+                            enabled: !state.busy,
+                            trailing: state.busy
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : null,
+                            onTap: () async {
+                              await _toggleYouTubeSaved(context);
+                            },
+                          );
+                        },
+                      )
+                    else
+                      _OptionTile(
+                        icon: _isStarred
+                            ? CupertinoIcons.heart_fill
+                            : CupertinoIcons.heart,
+                        title: _isStarred
+                            ? 'Remove from Liked Songs'
+                            : 'Add to Liked Songs',
+                        iconColor: _isStarred ? Theme.of(context).colorScheme.primary : null,
+                        onTap: () async {
+                          await _toggleFavorite(context);
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                          }
+                        },
+                      ),
                     _OptionTile(
                       icon: Icons.play_arrow_rounded,
                       title: 'Play Next',
@@ -725,6 +777,35 @@ class _SongOptionsSheetState extends State<_SongOptionsSheet> {
     }
   }
 
+  Future<void> _toggleYouTubeSaved(BuildContext context) async {
+    final playerProvider = Provider.of<PlayerProvider>(context, listen: false);
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      await playerProvider.toggleYouTubeSaved(widget.song);
+      if (!mounted) {
+        return;
+      }
+      final nowSaved = playerProvider.isYouTubeSaved(widget.song);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(nowSaved ? 'Saving to library started' : 'Removed from library'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Save action failed: $e'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
   void _navigateToArtist(NavigatorState nav) {
     final participants = widget.song.artistParticipants;
 
@@ -897,12 +978,16 @@ class _OptionTile extends StatelessWidget {
   final String title;
   final VoidCallback onTap;
   final Color? iconColor;
+  final Widget? trailing;
+  final bool enabled;
 
   const _OptionTile({
     required this.icon,
     required this.title,
     required this.onTap,
     this.iconColor,
+    this.trailing,
+    this.enabled = true,
   });
 
   @override
@@ -910,7 +995,8 @@ class _OptionTile extends StatelessWidget {
     return ListTile(
       leading: Icon(icon, color: iconColor ?? Theme.of(context).colorScheme.primary),
       title: Text(title),
-      onTap: onTap,
+      trailing: trailing,
+      onTap: enabled ? onTap : null,
     );
   }
 }
