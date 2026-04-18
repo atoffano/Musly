@@ -12,11 +12,17 @@ bool isLocalFilePath(String? s) {
   return false;
 }
 
+bool isRemoteHttpUrl(String? s) {
+  if (s == null || s.isEmpty) return false;
+  return s.startsWith('http://') || s.startsWith('https://');
+}
+
 class _ImageUrlCache {
   static final Map<String, String> _cache = {};
 
   static String getUrl(SubsonicService service, String? coverArt, int size) {
     if (coverArt == null || coverArt.isEmpty) return '';
+    if (isRemoteHttpUrl(coverArt)) return coverArt;
     final key = '${coverArt}_$size';
     return _cache.putIfAbsent(
       key,

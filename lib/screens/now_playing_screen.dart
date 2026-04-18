@@ -24,7 +24,7 @@ import 'album_screen.dart';
 import 'artist_screen.dart';
 import '../widgets/cast_button.dart';
 import '../widgets/multi_artist_widget.dart';
-import '../widgets/album_artwork.dart' show isLocalFilePath;
+import '../widgets/album_artwork.dart' show isLocalFilePath, isRemoteHttpUrl;
 
 const _kCarouselGap = 40.0;
 
@@ -265,6 +265,10 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
       return song.coverArt;
     }
 
+    if (isRemoteHttpUrl(song.coverArt)) {
+      return song.coverArt;
+    }
+
     final subsonicService = Provider.of<SubsonicService>(
       context,
       listen: false,
@@ -442,6 +446,9 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
         if (_cachedCoverArtId != song.coverArt) {
           _cachedCoverArtId = song.coverArt;
           if (isLocalFilePath(song.coverArt)) {
+            _cachedImageUrl = song.coverArt;
+            _cachedThumbnailUrl = song.coverArt;
+          } else if (isRemoteHttpUrl(song.coverArt)) {
             _cachedImageUrl = song.coverArt;
             _cachedThumbnailUrl = song.coverArt;
           } else {
@@ -1915,14 +1922,6 @@ class _SongInfoState extends State<_SongInfo> {
                 },
               ),
             ],
-          ),
-        ),
-        IconButton(
-          onPressed: () => _showAddToPlaylistDialog(context),
-          icon: const Icon(
-            CupertinoIcons.plus_circle,
-            color: Colors.white,
-            size: 26,
           ),
         ),
         if (song.isYouTube)
