@@ -257,8 +257,34 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
     }
   }
 
+  String? _extractYouTubeVideoId(Song song) {
+    if (!song.isYouTube) return null;
+    if (song.sourceId != null && song.sourceId!.isNotEmpty) {
+      return song.sourceId;
+    }
+    if (song.id.startsWith('yt:') && song.id.length > 3) {
+      return song.id.substring(3);
+    }
+    return null;
+  }
+
+  String? _youtubeArtworkUrl(Song song, {required bool fullSize}) {
+    final videoId = _extractYouTubeVideoId(song);
+    if (videoId == null) return null;
+    if (fullSize) {
+      return 'https://i.ytimg.com/vi/$videoId/hqdefault.jpg';
+    }
+    return 'https://i.ytimg.com/vi/$videoId/mqdefault.jpg';
+  }
+
   String? _getPreviewArtworkUrl(Song? song) {
     if (song == null) return null;
+
+    final youtubePreviewUrl = _youtubeArtworkUrl(song, fullSize: false);
+    if (youtubePreviewUrl != null) {
+      return youtubePreviewUrl;
+    }
+
     if (song.coverArt == null) return null;
 
     if (isLocalFilePath(song.coverArt)) {
@@ -443,9 +469,17 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
           );
         }
 
-        if (_cachedCoverArtId != song.coverArt) {
-          _cachedCoverArtId = song.coverArt;
-          if (isLocalFilePath(song.coverArt)) {
+        final artworkCacheKey =
+            '${song.coverArt}|${song.sourceType}|${song.sourceId}|${song.id}';
+        if (_cachedCoverArtId != artworkCacheKey) {
+          _cachedCoverArtId = artworkCacheKey;
+          final youtubeImageUrl = _youtubeArtworkUrl(song, fullSize: true);
+          final youtubeThumbnailUrl = _youtubeArtworkUrl(song, fullSize: false);
+
+          if (youtubeImageUrl != null) {
+            _cachedImageUrl = youtubeImageUrl;
+            _cachedThumbnailUrl = youtubeThumbnailUrl;
+          } else if (isLocalFilePath(song.coverArt)) {
             _cachedImageUrl = song.coverArt;
             _cachedThumbnailUrl = song.coverArt;
           } else if (isRemoteHttpUrl(song.coverArt)) {
