@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/artist_ref.dart';
+import '../screens/bridge_artist_screen.dart';
 import '../screens/artist_screen.dart';
 import '../services/subsonic_service.dart';
 import '../theme/app_theme.dart';
@@ -65,7 +66,18 @@ class MultiArtistWidget extends StatelessWidget {
   }
 
   void _navigate(BuildContext context, ArtistRef artist) {
-    if (artist.id.isNotEmpty) {
+    if (artist.id.startsWith('yt:')) {
+      final browseId = artist.id.substring(3);
+      final navigator = Navigator.of(context);
+      onBeforeNavigate?.call();
+      navigator.push(MaterialPageRoute(
+        builder: (_) => BridgeArtistScreen(
+          artistName: artist.name,
+          browseId: browseId,
+          heroCoverArt: artist.coverArt,
+        ),
+      ));
+    } else if (artist.id.isNotEmpty) {
       final navigator = Navigator.of(context);
       onBeforeNavigate?.call();
       navigator.push(MaterialPageRoute(
@@ -97,25 +109,17 @@ class MultiArtistWidget extends StatelessWidget {
           builder: (_) => ArtistScreen(artistId: matched.id),
         ));
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.artistNotFound(name),
-            ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        onBeforeNavigate?.call();
+        navigator.push(MaterialPageRoute(
+          builder: (_) => BridgeArtistScreen(artistName: name),
+        ));
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              AppLocalizations.of(context)!.errorSearchingArtist(e),
-            ),
-            duration: const Duration(seconds: 2),
-          ),
-        );
+        onBeforeNavigate?.call();
+        navigator.push(MaterialPageRoute(
+          builder: (_) => BridgeArtistScreen(artistName: name),
+        ));
       }
     }
   }

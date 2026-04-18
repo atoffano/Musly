@@ -44,6 +44,7 @@ class LibraryProvider extends ChangeNotifier {
   LibraryProvider(this._subsonicService, {MuslyBackendService? muslyBackendService})
       : _muslyBackendService = muslyBackendService ?? MuslyBackendService();
   SubsonicService get subsonicService => _subsonicService;
+  MuslyBackendService get muslyBackendService => _muslyBackendService;
 
   void setLocalMusicService(LocalMusicService service) {
     

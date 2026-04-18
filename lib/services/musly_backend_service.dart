@@ -72,6 +72,32 @@ class MuslyBackendService {
     return SearchResult(artists: const [], albums: const [], songs: songs);
   }
 
+  Future<SearchResult> artistTopSongs(String baseUrl, String browseId) async {
+    final response = await _dio.post(
+      '$baseUrl/api/artist/top-songs',
+      data: {'browseId': browseId},
+    );
+    final payload = response.data as Map<String, dynamic>;
+    final songsJson = (payload['songs'] as List?) ?? const [];
+    final songs = songsJson
+        .map((raw) => Song.fromJson(raw as Map<String, dynamic>))
+        .toList();
+    return SearchResult(artists: const [], albums: const [], songs: songs);
+  }
+
+  Future<SearchResult> artistDiscography(String baseUrl, String browseId) async {
+    final response = await _dio.post(
+      '$baseUrl/api/artist/full-discography',
+      data: {'browseId': browseId},
+    );
+    final payload = response.data as Map<String, dynamic>;
+    final songsJson = (payload['songs'] as List?) ?? const [];
+    final songs = songsJson
+        .map((raw) => Song.fromJson(raw as Map<String, dynamic>))
+        .toList();
+    return SearchResult(artists: const [], albums: const [], songs: songs);
+  }
+
   Future<String> resolveStreamUrl(String baseUrl, String videoId) async {
     final response = await _dio.post(
       '$baseUrl/api/stream',
