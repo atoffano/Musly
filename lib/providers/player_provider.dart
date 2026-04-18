@@ -89,8 +89,7 @@ class PlayerProvider extends ChangeNotifier {
     this._upnpService,
     this._audioHandler,
     {MuslyBackendService? muslyBackendService}
-  ) {
-    _muslyBackendService = muslyBackendService ?? MuslyBackendService();
+  ) : _muslyBackendService = muslyBackendService ?? MuslyBackendService() {
     _storageService = storageService;
     _discordRpcService = DiscordRpcService(storageService);
     _castService.addListener(_onCastStateChanged);
