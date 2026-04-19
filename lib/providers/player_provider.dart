@@ -789,7 +789,16 @@ class PlayerProvider extends ChangeNotifier {
         notifyListeners();
         _startYouTubeSavePolling(song, key, result.jobId, targetSaved, wasSaved);
       } else {
-        final removed = await _muslyBackendService.deleteSong(bridgeUrl, key);
+        final songIdFallback =
+            song.id.isNotEmpty && !song.id.startsWith('yt:') ? song.id : null;
+        var removed = await _muslyBackendService.deleteSong(bridgeUrl, key);
+        if (!removed && songIdFallback != null) {
+          removed = await _muslyBackendService.deleteSong(
+            bridgeUrl,
+            '',
+            songId: songIdFallback,
+          );
+        }
         if (!removed) {
           throw Exception('Song is not currently saved in the bridge state');
         }
@@ -818,7 +827,8 @@ class PlayerProvider extends ChangeNotifier {
 
     final key = _youtubeKey(song);
     final deleteKey = key ?? '';
-    final songIdFallback = (key == null || key.isEmpty) ? song.id : null;
+    final songIdFallback =
+        song.id.isNotEmpty && !song.id.startsWith('yt:') ? song.id : null;
 
     if ((deleteKey.isEmpty) && (songIdFallback == null || songIdFallback.isEmpty)) {
       throw Exception('Missing source id for remove action');
@@ -836,11 +846,18 @@ class PlayerProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final removed = await _muslyBackendService.deleteSong(
+      var removed = await _muslyBackendService.deleteSong(
         bridgeUrl,
         deleteKey,
-        songId: songIdFallback,
+        songId: deleteKey.isEmpty ? songIdFallback : null,
       );
+      if (!removed && deleteKey.isNotEmpty && songIdFallback != null) {
+        removed = await _muslyBackendService.deleteSong(
+          bridgeUrl,
+          '',
+          songId: songIdFallback,
+        );
+      }
       if (!removed) {
         throw Exception('Song is not currently saved in the bridge state');
       }
