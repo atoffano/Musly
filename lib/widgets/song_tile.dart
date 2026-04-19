@@ -903,13 +903,7 @@ class _SongOptionsSheetState extends State<_SongOptionsSheet> {
     }
 
     try {
-      if (_canToggleLibrarySaved(widget.song)) {
-        await playerProvider.removeYouTubeSaved(widget.song);
-      } else {
-        throw Exception(
-          'This track cannot be removed here (missing bridge source id).',
-        );
-      }
+      await playerProvider.removeYouTubeSaved(widget.song);
 
       await libraryProvider.refreshAllSongsCache();
       await libraryProvider.loadStarred();

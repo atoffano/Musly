@@ -842,9 +842,7 @@ class PlayerProvider extends ChangeNotifier {
         songId: songIdFallback,
       );
       if (!removed) {
-        debugPrint(
-          'Bridge delete reported already absent for sourceId=$deleteKey songId=$songIdFallback',
-        );
+        throw Exception('Song is not currently saved in the bridge state');
       }
 
       await _libraryProvider?.refreshAllSongsCache();
