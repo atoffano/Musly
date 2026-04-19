@@ -113,7 +113,6 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
         );
         break;
       case SongSortOption.recentlyAdded:
-        
         _sortedSongs = List.from(_songs.reversed);
         break;
     }
@@ -251,51 +250,38 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
             ),
         ],
       ),
-        body: _isLoading
+      body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _songs.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.music_note_outlined,
-                    size: 64,
-                    color: Colors.grey[600],
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.music_note_outlined,
+                        size: 64,
+                        color: Colors.grey[600],
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        'No songs found',
+                        style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'No songs found',
-                    style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _refreshSongs,
-              child: Column(
-                children: [
-                
-                  Expanded(
-                    child: ListView.builder(
-                      controller: _scrollController,
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      padding: const EdgeInsets.only(bottom: 120),
-                      itemCount: _sortedSongs.length,
-                      itemBuilder: (context, index) {
-                        final song = _sortedSongs[index];
-                        return SongTile(
-                          song: song,
-                          playlist: _sortedSongs,
-                          index: index,
-                          showAlbum: true,
-                          showArtist: true,
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
+                )
+              : RefreshIndicator(
+                  onRefresh: _refreshSongs,
+                  child: Column(
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 8,
+                        ),
+                        child: Row(
+                          children: [
+                            GestureDetector(
                               onTap: _showSortOptions,
                               child: Row(
                                 children: [
@@ -315,93 +301,94 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
                                 ],
                               ),
                             ),
+                            const Spacer(),
+                            IconButton(
+                              onPressed: () => _playAll(shuffle: true),
+                              icon: Icon(
+                                Icons.shuffle_rounded,
+                                color: isDark ? Colors.white70 : Colors.black54,
+                                size: 28,
+                              ),
+                              tooltip: 'Shuffle play',
+                            ),
+                            const SizedBox(width: 8),
+                            Consumer<PlayerProvider>(
+                              builder: (context, playerProvider, _) {
+                                final isCurrentPlaylist =
+                                    playerProvider.queue.isNotEmpty &&
+                                    playerProvider.queue.any(
+                                      (song) => _sortedSongs.any(
+                                        (s) => s.id == song.id,
+                                      ),
+                                    );
+                                final isPlaying =
+                                    isCurrentPlaylist && playerProvider.isPlaying;
+
+                                return GestureDetector(
+                                  onTap: () {
+                                    if (isCurrentPlaylist &&
+                                        playerProvider.currentSong != null) {
+                                      if (playerProvider.isPlaying) {
+                                        playerProvider.pause();
+                                      } else {
+                                        playerProvider.play();
+                                      }
+                                    } else {
+                                      _playAll();
+                                    }
+                                  },
+                                  child: Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.appleMusicRed,
+                                      shape: BoxShape.circle,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppTheme.appleMusicRed.withValues(
+                                            alpha: 0.4,
+                                          ),
+                                          blurRadius: 12,
+                                          offset: const Offset(0, 4),
+                                        ),
+                                      ],
+                                    ),
+                                    child: Icon(
+                                      isPlaying
+                                          ? Icons.pause_rounded
+                                          : Icons.play_arrow_rounded,
+                                      color: Colors.white,
+                                      size: 28,
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
                           ],
                         ),
                       ),
-                      
-                      IconButton(
-                        onPressed: () => _playAll(shuffle: true),
-                        icon: Icon(
-                          Icons.shuffle_rounded,
-                          color: isDark ? Colors.white70 : Colors.black54,
-                          size: 28,
+                      const Divider(height: 1),
+                      Expanded(
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          physics: const AlwaysScrollableScrollPhysics(),
+                          padding: const EdgeInsets.only(bottom: 120),
+                          itemCount: _sortedSongs.length,
+                          itemBuilder: (context, index) {
+                            final song = _sortedSongs[index];
+                            return SongTile(
+                              song: song,
+                              playlist: _sortedSongs,
+                              index: index,
+                              showAlbum: true,
+                              showArtist: true,
+                            );
+                          },
                         ),
-                        tooltip: 'Shuffle play',
-                      ),
-                      const SizedBox(width: 8),
-                      
-                      Consumer<PlayerProvider>(
-                        builder: (context, playerProvider, _) {
-                          final isCurrentPlaylist =
-                              playerProvider.queue.isNotEmpty &&
-                              playerProvider.queue.any(
-                                (song) =>
-                                    _sortedSongs.any((s) => s.id == song.id),
-                              );
-                          final isPlaying =
-                              isCurrentPlaylist && playerProvider.isPlaying;
-
-                          return GestureDetector(
-                            onTap: () {
-                              if (isCurrentPlaylist &&
-                                  playerProvider.currentSong != null) {
-                                if (playerProvider.isPlaying) {
-                                  playerProvider.pause();
-                                } else {
-                                  playerProvider.play();
-                                }
-                              } else {
-                                _playAll();
-                              }
-                            },
-                            child: Container(
-                              width: 48,
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: AppTheme.appleMusicRed,
-                                shape: BoxShape.circle,
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppTheme.appleMusicRed.withValues(
-                                      alpha: 0.4,
-                                    ),
-                                    blurRadius: 12,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                isPlaying
-                                    ? Icons.pause_rounded
-                                    : Icons.play_arrow_rounded,
-                                color: Colors.white,
-                                size: 28,
-                              ),
-                            ),
-                          );
-                        },
                       ),
                     ],
                   ),
                 ),
-                const Divider(height: 1),
-                Expanded(
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    padding: const EdgeInsets.only(bottom: 100),
-                    itemCount: _sortedSongs.length,
-                    itemBuilder: (context, index) {
-                      return SongTile(
-                        song: _sortedSongs[index],
-                        playlist: _sortedSongs,
-                        index: index,
-                        showAlbum: true,
-                      );
-                    },
-                  ),
-                ),
-              ],
-            ),
     );
   }
 }
