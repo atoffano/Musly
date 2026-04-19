@@ -550,6 +550,12 @@ class PlayerProvider extends ChangeNotifier {
       _resolvedArtworkUrl = null;
       return;
     }
+    if (song.coverArt!.startsWith('http://') ||
+        song.coverArt!.startsWith('https://')) {
+      _resolvedArtworkUrl = song.coverArt;
+      if (_currentSong?.id == song.id) _updateAllServices();
+      return;
+    }
     if (song.isLocal) {
       _resolvedArtworkUrl = Uri.file(song.coverArt!).toString();
       return;
@@ -1132,9 +1138,7 @@ class PlayerProvider extends ChangeNotifier {
         if (_audioPlayer.playing) await _audioPlayer.stop();
 
         final playUrl = await _resolvePlayableUrl(song);
-        final coverUrl = song.isLocal == true && song.coverArt != null
-            ? song.coverArt!
-            : _subsonicService.getCoverArtUrl(song.coverArt ?? song.id);
+        final coverUrl = _resolveSongArtworkUrl(song, size: 600);
 
         await _castService.loadMedia(
           url: playUrl,
@@ -1164,9 +1168,7 @@ class PlayerProvider extends ChangeNotifier {
             title: song.title,
             artist: song.artist ?? 'Unknown Artist',
             album: song.album,
-            albumArtUrl: song.coverArt != null
-                ? _subsonicService.getCoverArtUrl(song.coverArt, size: 0)
-                : null,
+            albumArtUrl: _resolveSongArtworkUrl(song, size: 0),
             durationSecs: song.duration,
           );
           if (!success) {
@@ -1273,6 +1275,30 @@ class PlayerProvider extends ChangeNotifier {
       return null;
     }
     return '${uri.scheme}://${uri.host}:8788';
+  }
+
+  String? _resolveSongArtworkUrl(Song song, {int size = 300}) {
+    final coverArt = song.coverArt;
+    if (coverArt != null && coverArt.isNotEmpty) {
+      if (coverArt.startsWith('http://') || coverArt.startsWith('https://')) {
+        return coverArt;
+      }
+      if (song.isLocal) {
+        return coverArt;
+      }
+      return _subsonicService.getCoverArtUrl(coverArt, size: size);
+    }
+
+    final sourceId = song.sourceId ??
+        (song.id.startsWith('yt:') ? song.id.substring(3) : null);
+    if (sourceId != null && sourceId.isNotEmpty) {
+      return 'https://i.ytimg.com/vi/$sourceId/hqdefault.jpg';
+    }
+
+    if (!song.isLocal && song.id.isNotEmpty) {
+      return _subsonicService.getCoverArtUrl(song.id, size: size);
+    }
+    return null;
   }
 
   Future<void> playRadioStation(RadioStation station) async {
