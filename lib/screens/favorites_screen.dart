@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/models.dart';
+import '../providers/library_provider.dart';
 import '../services/subsonic_service.dart';
 import '../widgets/widgets.dart';
 
@@ -26,17 +27,15 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Future<void> _loadFavorites() async {
     setState(() => _isLoading = true);
 
-    final subsonicService = Provider.of<SubsonicService>(
-      context,
-      listen: false,
-    );
+    final libraryProvider = Provider.of<LibraryProvider>(context, listen: false);
 
     try {
-      final starred = await subsonicService.getStarred();
+      await libraryProvider.loadStarred();
+      final starred = libraryProvider.starred;
       if (mounted) {
         setState(() {
-          _favoriteSongs = starred.songs;
-          _favoriteAlbums = starred.albums;
+          _favoriteSongs = starred?.songs ?? const [];
+          _favoriteAlbums = starred?.albums ?? const [];
           _isLoading = false;
         });
       }
@@ -49,6 +48,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final starred = context.select<LibraryProvider, SearchResult?>(
+      (provider) => provider.starred,
+    );
+    if (!_isLoading && starred != null) {
+      _favoriteSongs = starred.songs;
+      _favoriteAlbums = starred.albums;
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Favorites'),
@@ -77,9 +84,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _selectedTab == 0
-          ? _buildSongsList()
-          : _buildAlbumsList(),
+          : RefreshIndicator(
+              onRefresh: _loadFavorites,
+              child: _selectedTab == 0 ? _buildSongsList() : _buildAlbumsList(),
+            ),
     );
   }
 
@@ -98,6 +106,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     }
 
     return ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(bottom: 150),
       itemCount: _favoriteSongs.length,
       itemBuilder: (context, index) {
@@ -165,13 +174,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       context,
       listen: false,
     );
+    final libraryProvider = Provider.of<LibraryProvider>(context, listen: false);
 
     try {
       await subsonicService.unstar(id: song.id);
+      await libraryProvider.loadStarred();
       if (mounted) {
-        setState(() {
-          _favoriteSongs.removeAt(index);
-        });
+        setState(() {});
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Removed from favorites'),
@@ -206,6 +215,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     }
 
     return GridView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16).copyWith(bottom: 150),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,

@@ -117,6 +117,47 @@ class LibraryProvider extends ChangeNotifier {
   List<Album> get cachedAllAlbums => _cachedAllAlbums;
   List<Song> get cachedAllSongs => _cachedAllSongs;
 
+  String? _youtubeKeyFromSong(Song song) {
+    final sourceId =
+        song.sourceId ?? (song.id.startsWith('yt:') ? song.id.substring(3) : null);
+    if (sourceId == null || sourceId.isEmpty) {
+      return null;
+    }
+    return sourceId;
+  }
+
+  bool isYouTubeSavedInLibraryByKey(String key) {
+    return _cachedAllSongs.any((song) {
+      final songKey = _youtubeKeyFromSong(song);
+      return songKey == key;
+    });
+  }
+
+  Future<void> refreshAllSongsCache() async {
+    if (_localOnlyMode && _localMusicService != null) {
+      _cachedAllSongs = List.from(_localMusicService!.songs);
+      _randomSongs = _cachedAllSongs.take(50).toList();
+      notifyListeners();
+      return;
+    }
+
+    final fetchedSongs = await getAllSongs();
+    if (fetchedSongs.isEmpty && _cachedAllSongs.isNotEmpty) {
+      return;
+    }
+
+    final dedupedById = <String, Song>{};
+    for (final song in fetchedSongs) {
+      dedupedById[song.id] = song;
+    }
+
+    _cachedAllSongs = dedupedById.values.toList();
+    _randomSongs = _cachedAllSongs.take(50).toList();
+    _lastCacheUpdate = DateTime.now();
+    await _saveCachedData();
+    notifyListeners();
+  }
+
   Future<void> initialize() async {
     if (_isInitialized) return;
 
@@ -216,7 +257,7 @@ class LibraryProvider extends ChangeNotifier {
     await _loadCachedData(loadFullLibrary: true);
 
     if (_cachedAllSongs.isEmpty) {
-      await _refreshAllDataInBackground();
+      await refreshAllSongsCache();
     }
 
     _isLoading = false;
@@ -291,6 +332,7 @@ class LibraryProvider extends ChangeNotifier {
       const pageSize = 500;
       int offset = 0;
       final List<Album> allAlbums = [];
+      final List<Song> allSongs = [];
 
       while (true) {
         final page = await _subsonicService.getAlbumList(
@@ -304,7 +346,22 @@ class LibraryProvider extends ChangeNotifier {
       }
 
       _cachedAllAlbums = allAlbums;
-      _cachedAllSongs = [];
+
+      for (final album in _cachedAllAlbums) {
+        try {
+          final songs = await _subsonicService.getAlbumSongs(album.id);
+          allSongs.addAll(songs);
+        } catch (e) {
+          debugPrint('Error refreshing songs for album ${album.id}: $e');
+        }
+      }
+
+      final dedupedById = <String, Song>{};
+      for (final song in allSongs) {
+        dedupedById[song.id] = song;
+      }
+
+      _cachedAllSongs = dedupedById.values.toList();
       _lastCacheUpdate = DateTime.now();
 
       await _saveCachedData();

@@ -53,6 +53,9 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
     );
 
     await libraryProvider.ensureLibraryLoaded();
+    if (libraryProvider.cachedAllSongs.isEmpty) {
+      await libraryProvider.refreshAllSongsCache();
+    }
 
     if (mounted) {
       setState(() {
@@ -61,6 +64,11 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _refreshSongs() async {
+    final libraryProvider = Provider.of<LibraryProvider>(context, listen: false);
+    await libraryProvider.refreshAllSongsCache();
   }
 
   void _sortSongs() {
@@ -222,6 +230,14 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
+    final providerSongs = context.select<LibraryProvider, List<Song>>(
+      (provider) => provider.cachedAllSongs,
+    );
+    if (!_isLoading && !identical(providerSongs, _songs)) {
+      _songs = providerSongs;
+      _sortSongs();
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('All Songs'),
@@ -235,7 +251,7 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
             ),
         ],
       ),
-      body: _isLoading
+        body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _songs.isEmpty
           ? Center(
@@ -255,27 +271,31 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
                 ],
               ),
             )
-          : Column(
-              children: [
+          : RefreshIndicator(
+              onRefresh: _refreshSongs,
+              child: Column(
+                children: [
                 
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${_sortedSongs.length} songs',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: isDark ? Colors.white : Colors.black87,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            GestureDetector(
+                  Expanded(
+                    child: ListView.builder(
+                      controller: _scrollController,
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.only(bottom: 120),
+                      itemCount: _sortedSongs.length,
+                      itemBuilder: (context, index) {
+                        final song = _sortedSongs[index];
+                        return SongTile(
+                          song: song,
+                          playlist: _sortedSongs,
+                          index: index,
+                          showAlbum: true,
+                          showArtist: true,
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
                               onTap: _showSortOptions,
                               child: Row(
                                 children: [

@@ -269,6 +269,23 @@ class _NowPlayingScreenState extends State<NowPlayingScreen>
   }
 
   String? _youtubeArtworkUrl(Song song, {required bool fullSize}) {
+    if (!song.isYouTube) return null;
+
+    if (isLocalFilePath(song.coverArt) || isRemoteHttpUrl(song.coverArt)) {
+      return song.coverArt;
+    }
+
+    if (song.coverArt != null && song.coverArt!.isNotEmpty) {
+      final subsonicService = Provider.of<SubsonicService>(
+        context,
+        listen: false,
+      );
+      return subsonicService.getCoverArtUrl(
+        song.coverArt!,
+        size: fullSize ? 600 : 200,
+      );
+    }
+
     final videoId = _extractYouTubeVideoId(song);
     if (videoId == null) return null;
     if (fullSize) {

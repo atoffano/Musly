@@ -6,8 +6,10 @@ import 'package:provider/provider.dart';
 
 import '../l10n/app_localizations.dart';
 import '../models/artist_ref.dart';
+import '../models/artist.dart';
 import '../screens/bridge_artist_screen.dart';
 import '../screens/artist_screen.dart';
+import '../providers/library_provider.dart';
 import '../services/subsonic_service.dart';
 import '../theme/app_theme.dart';
 import 'album_artwork.dart';
@@ -66,6 +68,18 @@ class MultiArtistWidget extends StatelessWidget {
   }
 
   void _navigate(BuildContext context, ArtistRef artist) {
+    final libraryProvider = Provider.of<LibraryProvider>(context, listen: false);
+    final localArtist = _findLocalArtistByName(libraryProvider, artist.name);
+
+    if (localArtist != null) {
+      final navigator = Navigator.of(context);
+      onBeforeNavigate?.call();
+      navigator.push(MaterialPageRoute(
+        builder: (_) => ArtistScreen(artistId: localArtist.id),
+      ));
+      return;
+    }
+
     if (artist.id.startsWith('yt:')) {
       final browseId = artist.id.substring(3);
       final navigator = Navigator.of(context);
@@ -88,8 +102,30 @@ class MultiArtistWidget extends StatelessWidget {
     }
   }
 
+  Artist? _findLocalArtistByName(LibraryProvider library, String name) {
+    if (name.isEmpty) return null;
+    final normalized = name.toLowerCase().trim();
+    try {
+      return library.artists.firstWhere(
+        (artist) => artist.name.toLowerCase().trim() == normalized,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _searchAndNavigate(BuildContext context, String name) async {
     final navigator = Navigator.of(context);
+    final libraryProvider = Provider.of<LibraryProvider>(context, listen: false);
+    final localArtist = _findLocalArtistByName(libraryProvider, name);
+    if (localArtist != null) {
+      onBeforeNavigate?.call();
+      navigator.push(MaterialPageRoute(
+        builder: (_) => ArtistScreen(artistId: localArtist.id),
+      ));
+      return;
+    }
+
     final subsonic = Provider.of<SubsonicService>(context, listen: false);
     try {
       final result = await subsonic.search(
