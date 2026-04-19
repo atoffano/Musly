@@ -192,21 +192,61 @@ class SongTile extends StatelessWidget {
               busy: provider.isYouTubeSaveBusy(song),
             ),
             builder: (context, state, _) {
-              if (!state.saved && !state.busy) {
-                return const SizedBox.shrink();
-              }
               return Padding(
                 padding: const EdgeInsets.only(right: 4),
                 child: state.busy
                     ? const SizedBox(
-                        width: 14,
-                        height: 14,
+                        width: 18,
+                        height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Icon(
-                        Icons.check_circle,
-                        size: 14,
-                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.85),
+                    : IconButton(
+                        visualDensity: VisualDensity.compact,
+                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                        padding: EdgeInsets.zero,
+                        tooltip: state.saved ? 'Remove from library' : 'Add to library',
+                        onPressed: () async {
+                          final playerProvider = Provider.of<PlayerProvider>(
+                            context,
+                            listen: false,
+                          );
+                          final messenger = ScaffoldMessenger.of(context);
+
+                          try {
+                            await playerProvider.toggleYouTubeSaved(song);
+                            if (!context.mounted) {
+                              return;
+                            }
+                            final nowSaved = playerProvider.isYouTubeSaved(song);
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  nowSaved
+                                      ? 'Saving to library started'
+                                      : 'Removed from library',
+                                ),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          } catch (e) {
+                            if (!context.mounted) {
+                              return;
+                            }
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Save action failed: $e'),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                        icon: Icon(
+                          state.saved ? Icons.check_circle : Icons.add_circle_outline,
+                          size: 18,
+                          color: state.saved
+                              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.9)
+                              : Theme.of(context).textTheme.bodySmall?.color,
+                        ),
                       ),
               );
             },
@@ -734,12 +774,17 @@ class _SongOptionsSheetState extends State<_SongOptionsSheet> {
       context,
       listen: false,
     );
+    final libraryProvider = Provider.of<LibraryProvider>(
+      context,
+      listen: false,
+    );
     final l10n = AppLocalizations.of(context)!;
     final messenger = ScaffoldMessenger.of(context);
 
     try {
       if (_isStarred) {
         await subsonicService.unstar(id: widget.song.id);
+        await libraryProvider.loadStarred();
         setState(() {
           _isStarred = false;
         });
@@ -753,6 +798,7 @@ class _SongOptionsSheetState extends State<_SongOptionsSheet> {
         }
       } else {
         await subsonicService.star(id: widget.song.id);
+        await libraryProvider.loadStarred();
         setState(() {
           _isStarred = true;
         });
