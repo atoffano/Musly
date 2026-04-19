@@ -1922,26 +1922,10 @@ class _SongInfo extends StatefulWidget {
 }
 
 class _SongInfoState extends State<_SongInfo> {
-  bool _isStarred = false;
-
   bool _canToggleLibrarySaved(Song song) {
     return song.isYouTube ||
         (song.sourceId != null && song.sourceId!.isNotEmpty) ||
         song.id.startsWith('yt:');
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _isStarred = widget.song?.starred ?? false;
-  }
-
-  @override
-  void didUpdateWidget(_SongInfo oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.song?.id != widget.song?.id) {
-      _isStarred = widget.song?.starred ?? false;
-    }
   }
 
   @override
@@ -2004,13 +1988,24 @@ class _SongInfoState extends State<_SongInfo> {
               );
             },
           ),
-        IconButton(
-          onPressed: () => _toggleFavorite(context),
-          icon: Icon(
-            _isStarred ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
-            color: _isStarred ? AppTheme.appleMusicRed : Colors.white,
-            size: 26,
-          ),
+        Selector<PlayerProvider, bool>(
+          selector: (_, provider) {
+            final current = provider.currentSong;
+            if (current != null && current.id == song.id) {
+              return current.starred == true;
+            }
+            return song.starred == true;
+          },
+          builder: (context, isStarred, _) {
+            return IconButton(
+              onPressed: () => _toggleFavorite(context),
+              icon: Icon(
+                isStarred ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
+                color: isStarred ? AppTheme.appleMusicRed : Colors.white,
+                size: 26,
+              ),
+            );
+          },
         ),
       ],
     );
@@ -2043,34 +2038,30 @@ class _SongInfoState extends State<_SongInfo> {
 
   Future<void> _toggleFavorite(BuildContext context) async {
     if (widget.song == null) return;
-    final subsonicService = Provider.of<SubsonicService>(
-      context,
-      listen: false,
-    );
+    final player = context.read<PlayerProvider>();
+    final l10n = AppLocalizations.of(context)!;
     try {
-      if (_isStarred) {
-        await subsonicService.unstar(id: widget.song!.id);
-        setState(() => _isStarred = false);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppLocalizations.of(context)!.removedFromFavorites),
-              duration: const Duration(seconds: 1),
-            ),
-          );
-        }
+      final wasStarred =
+          (player.currentSong?.id == widget.song!.id
+              ? player.currentSong?.starred
+              : widget.song!.starred) ==
+          true;
+
+      if (player.currentSong?.id == widget.song!.id) {
+        await player.toggleFavorite();
       } else {
-        await subsonicService.star(id: widget.song!.id);
-        setState(() => _isStarred = true);
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(AppLocalizations.of(context)!.addedToFavorites),
-              duration: const Duration(seconds: 1),
-            ),
-          );
-        }
+        await player.toggleFavoriteForSong(widget.song!);
       }
+
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            wasStarred ? l10n.removedFromFavorites : l10n.addedToFavorites,
+          ),
+          duration: const Duration(seconds: 1),
+        ),
+      );
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

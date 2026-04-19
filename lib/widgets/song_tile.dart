@@ -907,9 +907,8 @@ class _SongOptionsSheetState extends State<_SongOptionsSheet> {
     }
 
     try {
-      if (_canToggleLibrarySaved(widget.song) &&
-          playerProvider.isYouTubeSaved(widget.song)) {
-        await playerProvider.toggleYouTubeSaved(widget.song);
+      if (_canToggleLibrarySaved(widget.song)) {
+        await playerProvider.removeYouTubeSaved(widget.song);
       } else {
         await subsonicService.deleteSong(widget.song.id);
       }

@@ -810,6 +810,47 @@ class PlayerProvider extends ChangeNotifier {
     }
   }
 
+  Future<void> removeYouTubeSaved(Song song) async {
+    final bridgeUrl = _bridgeBaseUrl();
+    if (bridgeUrl == null) {
+      throw Exception('Bridge URL unavailable for remove action');
+    }
+
+    final key = _youtubeKey(song);
+    if (key == null || key.isEmpty) {
+      throw Exception('Missing source id for remove action');
+    }
+
+    if (_youtubeSaveLocks.contains(key)) {
+      return;
+    }
+
+    _youtubeSaveLocks.add(key);
+    _youtubeSaveErrors.remove(key);
+    _youtubeSaveStates[key] = YouTubeSaveState.saving;
+    notifyListeners();
+
+    try {
+      final removed = await _muslyBackendService.deleteSong(bridgeUrl, key);
+      if (!removed) {
+        debugPrint('Bridge delete reported already absent for sourceId=$key');
+      }
+
+      await _libraryProvider?.refreshAllSongsCache();
+      _youtubeSaveStates[key] = YouTubeSaveState.ready;
+      _youtubeSavedOverrides[key] = false;
+      _libraryProvider?.updateYouTubeSavedState(key, false);
+      _syncCurrentSongYoutubeState(song, false);
+      _finishYouTubeSaveAction(key);
+    } catch (e) {
+      _youtubeSaveStates[key] = YouTubeSaveState.error;
+      _youtubeSaveErrors[key] = e.toString();
+      _youtubeSaveLocks.remove(key);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   Future<void> setPlaybackSpeed(double speed) async {
     _playbackSpeed = speed.clamp(0.25, 4.0);
     await _audioPlayer.setSpeed(_playbackSpeed);
