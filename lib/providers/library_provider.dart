@@ -239,7 +239,7 @@ class LibraryProvider extends ChangeNotifier {
   }
 
   Future<void> ensureLibraryLoaded() async {
-    if (_cachedAllSongs.isNotEmpty) return;
+    if (_cachedAllSongs.isNotEmpty && _cachedAllAlbums.isNotEmpty) return;
 
     if (_localOnlyMode && _localMusicService != null) {
       _cachedAllSongs = List.from(_localMusicService!.songs);
@@ -255,6 +255,10 @@ class LibraryProvider extends ChangeNotifier {
     notifyListeners();
 
     await _loadCachedData(loadFullLibrary: true);
+
+    if (_cachedAllAlbums.isEmpty || _cachedAllSongs.isEmpty) {
+      await _refreshAllDataInBackground();
+    }
 
     if (_cachedAllSongs.isEmpty) {
       await refreshAllSongsCache();

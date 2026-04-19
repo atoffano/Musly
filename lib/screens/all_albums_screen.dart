@@ -49,9 +49,21 @@ class _AllAlbumsScreenState extends State<AllAlbumsScreen> {
     }
   }
 
+  Future<void> _refreshAlbums() async {
+    final libraryProvider = Provider.of<LibraryProvider>(context, listen: false);
+    await libraryProvider.ensureLibraryLoaded();
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final providerAlbums = context.select<LibraryProvider, List<Album>>(
+      (provider) => provider.cachedAllAlbums,
+    );
+
+    if (!_isLoading && !identical(providerAlbums, _albums)) {
+      _albums = providerAlbums;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -76,31 +88,35 @@ class _AllAlbumsScreenState extends State<AllAlbumsScreen> {
                 ],
               ),
             )
-          : GridView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                childAspectRatio: 0.7,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
+          : RefreshIndicator(
+              onRefresh: _refreshAlbums,
+              child: GridView.builder(
+                controller: _scrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.all(16),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  childAspectRatio: 0.7,
+                  crossAxisSpacing: 16,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: _albums.length,
+                itemBuilder: (context, index) {
+                  final album = _albums[index];
+                  return AlbumCard(
+                    album: album,
+                    size: double.infinity,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => AlbumScreen(albumId: album.id),
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
-              itemCount: _albums.length,
-              itemBuilder: (context, index) {
-                final album = _albums[index];
-                return AlbumCard(
-                  album: album,
-                  size: double.infinity,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AlbumScreen(albumId: album.id),
-                      ),
-                    );
-                  },
-                );
-              },
             ),
     );
   }

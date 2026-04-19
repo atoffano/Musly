@@ -878,10 +878,6 @@ class _SongOptionsSheetState extends State<_SongOptionsSheet> {
       listen: false,
     );
     final playerProvider = Provider.of<PlayerProvider>(context, listen: false);
-    final subsonicService = Provider.of<SubsonicService>(
-      context,
-      listen: false,
-    );
     final messenger = ScaffoldMessenger.of(context);
 
     final confirmed = await showDialog<bool>(
@@ -910,7 +906,9 @@ class _SongOptionsSheetState extends State<_SongOptionsSheet> {
       if (_canToggleLibrarySaved(widget.song)) {
         await playerProvider.removeYouTubeSaved(widget.song);
       } else {
-        await subsonicService.deleteSong(widget.song.id);
+        throw Exception(
+          'This track cannot be removed here (missing bridge source id).',
+        );
       }
 
       await libraryProvider.refreshAllSongsCache();
