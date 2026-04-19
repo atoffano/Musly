@@ -45,6 +45,12 @@ class SongTile extends StatelessWidget {
     this.onLongPress,
   });
 
+  bool _canToggleLibrarySaved(Song song) {
+    return song.isYouTube ||
+        (song.sourceId != null && song.sourceId!.isNotEmpty) ||
+        song.id.startsWith('yt:');
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -185,7 +191,7 @@ class SongTile extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (song.isYouTube)
+        if (_canToggleLibrarySaved(song))
           Selector<PlayerProvider, ({bool saved, bool busy})>(
             selector: (_, provider) => (
               saved: provider.isYouTubeSaved(song),
@@ -317,6 +323,12 @@ class _SongOptionsSheetState extends State<_SongOptionsSheet> {
     _isDownloaded = _offlineService.isSongDownloaded(widget.song.id);
   }
 
+  bool _canToggleLibrarySaved(Song song) {
+    return song.isYouTube ||
+        (song.sourceId != null && song.sourceId!.isNotEmpty) ||
+        song.id.startsWith('yt:');
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -378,7 +390,7 @@ class _SongOptionsSheetState extends State<_SongOptionsSheet> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    if (widget.song.isYouTube)
+                    if (_canToggleLibrarySaved(widget.song))
                       Selector<PlayerProvider, ({bool saved, bool busy})>(
                         selector: (_, provider) => (
                           saved: provider.isYouTubeSaved(widget.song),
@@ -419,6 +431,14 @@ class _SongOptionsSheetState extends State<_SongOptionsSheet> {
                           }
                         },
                       ),
+                    _OptionTile(
+                      icon: Icons.delete_outline_rounded,
+                      title: 'Remove Song',
+                      iconColor: Colors.redAccent,
+                      onTap: () async {
+                        await _removeSong(context);
+                      },
+                    ),
                     _OptionTile(
                       icon: Icons.play_arrow_rounded,
                       title: 'Play Next',
@@ -846,6 +866,70 @@ class _SongOptionsSheetState extends State<_SongOptionsSheet> {
       messenger.showSnackBar(
         SnackBar(
           content: Text('Save action failed: $e'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _removeSong(BuildContext context) async {
+    final libraryProvider = Provider.of<LibraryProvider>(
+      context,
+      listen: false,
+    );
+    final playerProvider = Provider.of<PlayerProvider>(context, listen: false);
+    final subsonicService = Provider.of<SubsonicService>(
+      context,
+      listen: false,
+    );
+    final messenger = ScaffoldMessenger.of(context);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Remove Song'),
+        content: const Text('Remove this song from your library?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Remove'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      if (_canToggleLibrarySaved(widget.song) &&
+          playerProvider.isYouTubeSaved(widget.song)) {
+        await playerProvider.toggleYouTubeSaved(widget.song);
+      } else {
+        await subsonicService.deleteSong(widget.song.id);
+      }
+
+      await libraryProvider.refreshAllSongsCache();
+      await libraryProvider.loadStarred();
+
+      if (!mounted) return;
+      Navigator.pop(context);
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Removed from library'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Remove failed: $e'),
           duration: const Duration(seconds: 2),
         ),
       );

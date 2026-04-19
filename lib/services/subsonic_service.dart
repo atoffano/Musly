@@ -538,6 +538,10 @@ class SubsonicService {
     await _request('deletePlaylist', {'id': id});
   }
 
+  Future<void> deleteSong(String id) async {
+    await _request('delete', {'id': id});
+  }
+
   Future<SearchResult> search(
     String query, {
     int artistCount = 20,

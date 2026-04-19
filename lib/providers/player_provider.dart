@@ -752,10 +752,6 @@ class PlayerProvider extends ChangeNotifier {
   }
 
   Future<void> toggleYouTubeSaved(Song song) async {
-    if (!song.isYouTube) {
-      return;
-    }
-
     final bridgeUrl = _bridgeBaseUrl();
     if (bridgeUrl == null) {
       throw Exception('Bridge URL unavailable for YouTube save action');

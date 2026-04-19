@@ -1924,6 +1924,12 @@ class _SongInfo extends StatefulWidget {
 class _SongInfoState extends State<_SongInfo> {
   bool _isStarred = false;
 
+  bool _canToggleLibrarySaved(Song song) {
+    return song.isYouTube ||
+        (song.sourceId != null && song.sourceId!.isNotEmpty) ||
+        song.id.startsWith('yt:');
+  }
+
   @override
   void initState() {
     super.initState();
@@ -1975,7 +1981,7 @@ class _SongInfoState extends State<_SongInfo> {
             ],
           ),
         ),
-        if (song.isYouTube)
+        if (_canToggleLibrarySaved(song))
           Selector<PlayerProvider, ({bool saved, bool busy})>(
             selector: (_, provider) => (
               saved: provider.isYouTubeSaved(song),
