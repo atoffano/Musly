@@ -132,10 +132,17 @@ class MuslyBackendService {
     return SaveJobSnapshot.fromJson(job);
   }
 
-  Future<bool> deleteSong(String baseUrl, String videoId) async {
+  Future<bool> deleteSong(
+    String baseUrl,
+    String videoId, {
+    String? songId,
+  }) async {
     final response = await _dio.post(
       '$baseUrl/api/delete',
-      data: {'videoId': videoId},
+      data: {
+        if (videoId.isNotEmpty) 'videoId': videoId,
+        if (songId != null && songId.isNotEmpty) 'songId': songId,
+      },
     );
     final payload = response.data as Map<String, dynamic>;
     return payload['status']?.toString() == 'removed';

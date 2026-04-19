@@ -817,35 +817,48 @@ class PlayerProvider extends ChangeNotifier {
     }
 
     final key = _youtubeKey(song);
-    if (key == null || key.isEmpty) {
+    final deleteKey = key ?? '';
+    final songIdFallback = (key == null || key.isEmpty) ? song.id : null;
+
+    if ((deleteKey.isEmpty) && (songIdFallback == null || songIdFallback.isEmpty)) {
       throw Exception('Missing source id for remove action');
     }
 
-    if (_youtubeSaveLocks.contains(key)) {
+    final lockKey = key ?? 'song:${song.id}';
+
+    if (_youtubeSaveLocks.contains(lockKey)) {
       return;
     }
 
-    _youtubeSaveLocks.add(key);
-    _youtubeSaveErrors.remove(key);
-    _youtubeSaveStates[key] = YouTubeSaveState.saving;
+    _youtubeSaveLocks.add(lockKey);
+    _youtubeSaveErrors.remove(lockKey);
+    _youtubeSaveStates[lockKey] = YouTubeSaveState.saving;
     notifyListeners();
 
     try {
-      final removed = await _muslyBackendService.deleteSong(bridgeUrl, key);
+      final removed = await _muslyBackendService.deleteSong(
+        bridgeUrl,
+        deleteKey,
+        songId: songIdFallback,
+      );
       if (!removed) {
-        debugPrint('Bridge delete reported already absent for sourceId=$key');
+        debugPrint(
+          'Bridge delete reported already absent for sourceId=$deleteKey songId=$songIdFallback',
+        );
       }
 
       await _libraryProvider?.refreshAllSongsCache();
-      _youtubeSaveStates[key] = YouTubeSaveState.ready;
-      _youtubeSavedOverrides[key] = false;
-      _libraryProvider?.updateYouTubeSavedState(key, false);
+      _youtubeSaveStates[lockKey] = YouTubeSaveState.ready;
+      if (key != null && key.isNotEmpty) {
+        _youtubeSavedOverrides[key] = false;
+        _libraryProvider?.updateYouTubeSavedState(key, false);
+      }
       _syncCurrentSongYoutubeState(song, false);
-      _finishYouTubeSaveAction(key);
+      _finishYouTubeSaveAction(lockKey);
     } catch (e) {
-      _youtubeSaveStates[key] = YouTubeSaveState.error;
-      _youtubeSaveErrors[key] = e.toString();
-      _youtubeSaveLocks.remove(key);
+      _youtubeSaveStates[lockKey] = YouTubeSaveState.error;
+      _youtubeSaveErrors[lockKey] = e.toString();
+      _youtubeSaveLocks.remove(lockKey);
       notifyListeners();
       rethrow;
     }
@@ -1746,12 +1759,16 @@ class PlayerProvider extends ChangeNotifier {
 
   void _syncCurrentSongYoutubeState(Song sourceSong, bool saved) {
     final current = _currentSong;
-    if (current == null || !current.isYouTube) {
+    if (current == null) {
       return;
     }
     final currentKey = _youtubeKey(current);
     final sourceKey = _youtubeKey(sourceSong);
-    if (currentKey != null && currentKey == sourceKey) {
+    if (currentKey != null && sourceKey != null && currentKey == sourceKey) {
+      _currentSong = current.copyWith(saved: saved);
+      return;
+    }
+    if (current.id == sourceSong.id) {
       _currentSong = current.copyWith(saved: saved);
     }
   }
