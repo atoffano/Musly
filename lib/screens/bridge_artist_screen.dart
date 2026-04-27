@@ -132,6 +132,11 @@ class _BridgeArtistScreenState extends State<BridgeArtistScreen> {
             expandedHeight: 230,
             flexibleSpace: FlexibleSpaceBar(
               title: Text(widget.artistName),
+              titlePadding: const EdgeInsetsDirectional.only(
+                start: 16,
+                end: 16,
+                bottom: 102,
+              ),
               background: Stack(
                 fit: StackFit.expand,
                 children: [
