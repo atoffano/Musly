@@ -188,12 +188,10 @@ class SongTile extends StatelessWidget {
   }
 
   Widget _buildTrailing(BuildContext context) {
-    final isDownloadedLocally = OfflineService().isSongDownloaded(song.id);
-
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        if (_canToggleLibrarySaved(song) && !isDownloadedLocally)
+        if (_canToggleLibrarySaved(song))
           Selector<PlayerProvider, ({bool saved, bool busy})>(
             selector: (_, provider) => (
               saved: provider.isYouTubeSaved(song),
