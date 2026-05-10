@@ -1144,7 +1144,7 @@ class PlayerProvider extends ChangeNotifier {
         if (_audioPlayer.playing) await _audioPlayer.stop();
 
         final playUrl = await _resolvePlayableUrl(song);
-        final coverUrl = _resolveSongArtworkUrl(song, size: 600);
+        final coverUrl = _resolveSongArtworkUrl(song, size: 600) ?? '';
 
         await _castService.loadMedia(
           url: playUrl,
