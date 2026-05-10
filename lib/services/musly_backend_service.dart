@@ -147,4 +147,12 @@ class MuslyBackendService {
     final payload = response.data as Map<String, dynamic>;
     return payload['status']?.toString() == 'removed';
   }
+
+  Future<void> scrobble(String baseUrl, Song song) async {
+    final data = <String, String>{'songId': song.id};
+    if (song.sourceId != null && song.sourceId!.isNotEmpty) {
+      data['videoId'] = song.sourceId!;
+    }
+    await _dio.post('$baseUrl/api/scrobble', data: data);
+  }
 }

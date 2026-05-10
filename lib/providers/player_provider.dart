@@ -1049,6 +1049,12 @@ class PlayerProvider extends ChangeNotifier {
       ) {
         _offlineService.queueScrobble(_currentSong!.id, submission: true);
       });
+      final bridgeUrl = _bridgeBaseUrl();
+      if (bridgeUrl != null) {
+        _muslyBackendService.scrobble(bridgeUrl, _currentSong!).catchError((e) =>
+          debugPrint('Bridge scrobble failed: $e'),
+        );
+      }
     }
 
     if (_currentSong != null && _recommendationService != null) {
@@ -1217,6 +1223,12 @@ class PlayerProvider extends ChangeNotifier {
           _offlineService.flushPendingScrobbles(_subsonicService).catchError((e) {
             debugPrint('Scrobble flush failed: $e');
           });
+        }
+        final bridgeUrl = _bridgeBaseUrl();
+        if (bridgeUrl != null) {
+          _muslyBackendService.scrobble(bridgeUrl, song).catchError((e) =>
+            debugPrint('Bridge scrobble failed: $e'),
+          );
         }
       }
 
