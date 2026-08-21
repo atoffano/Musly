@@ -202,6 +202,12 @@ abstract class AppLocalizations {
   /// **'Made For You'**
   String get madeForYou;
 
+  /// Recommendations section title in Home screen
+  ///
+  /// In en, this message translates to:
+  /// **'Recommendations'**
+  String get recommendations;
+
   /// Top rated albums title
   ///
   /// In en, this message translates to:

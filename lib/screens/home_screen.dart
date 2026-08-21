@@ -6,7 +6,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../models/models.dart';
 import '../providers/library_provider.dart';
 import '../providers/player_provider.dart';
+import '../providers/recommendations_provider.dart';
 import '../services/subsonic_service.dart';
+import '../services/storage_service.dart';
 import '../services/recommendation_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/navigation_helper.dart';
@@ -14,6 +16,7 @@ import '../widgets/widgets.dart';
 import 'album_screen.dart';
 import 'playlist_screen.dart';
 import 'history_screen.dart';
+import 'recommendations_screen.dart';
 import '../l10n/app_localizations.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -43,6 +46,29 @@ class _HomeScreenState extends State<HomeScreen> {
 
   bool get _isDesktop =>
       Platform.isMacOS || Platform.isWindows || Platform.isLinux;
+
+  @override
+  void initState() {
+    super.initState();
+    // Lazy-load recommendations when Home screen is first shown
+    _loadRecommendations();
+  }
+
+  Future<void> _loadRecommendations() async {
+    try {
+      final storageService = Provider.of<StorageService>(context, listen: false);
+      final settings = await storageService.loadSettings();
+      final bridgeUrl = settings?.bridgeUrl;
+      if (bridgeUrl != null && bridgeUrl.isNotEmpty) {
+        final recProvider = Provider.of<RecommendationsProvider>(context, listen: false);
+        if (!recProvider.initialized) {
+          await recProvider.loadMoodCategories(bridgeUrl);
+        }
+      }
+    } catch (e) {
+      // Silently fail — recommendations are optional
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -187,6 +213,97 @@ class _HomeScreenState extends State<HomeScreen> {
                       }),
                       const SizedBox(height: 24),
                     ],
+
+                    // YT Music Moods & Genres section
+                    Consumer<RecommendationsProvider>(
+                      builder: (context, recProvider, _) {
+                        if (recProvider.loading || !recProvider.hasData) {
+                          return const SizedBox.shrink();
+                        }
+                        // Collect the first few categories across all sections for a preview
+                        final previewCats = <MapEntry<String, dynamic>>[];
+                        for (final section in recProvider.sections) {
+                          for (final cat in section.categories.take(4)) {
+                            previewCats.add(MapEntry(section.name, cat));
+                          }
+                          if (previewCats.length >= 8) break;
+                        }
+                        if (previewCats.isEmpty) return const SizedBox.shrink();
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            GestureDetector(
+                              onTap: () => NavigationHelper.push(
+                                context,
+                                const RecommendationsScreen(),
+                              ),
+                              child: _SectionTitle(
+                                title: AppLocalizations.of(context)!.recommendations,
+                                icon: Icons.auto_awesome_rounded,
+                                hPad: hPad,
+                              ),
+                            ),
+                            SizedBox(
+                              height: 80,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                padding: EdgeInsets.symmetric(horizontal: hPad - 4),
+                                itemCount: previewCats.length,
+                                itemBuilder: (context, index) {
+                                  final cat = previewCats[index].value;
+                                  final colors = [
+                                    [const Color(0xFF8B5CF6), const Color(0xFFEC4899)],
+                                    [const Color(0xFF10B981), const Color(0xFF06B6D4)],
+                                    [const Color(0xFFF59E0B), const Color(0xFFEF4444)],
+                                    [const Color(0xFF3B82F6), const Color(0xFF6366F1)],
+                                  ];
+                                  final pair = colors[index % colors.length];
+                                  return Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                                    child: SizedBox(
+                                      width: 120,
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        child: InkWell(
+                                          borderRadius: BorderRadius.circular(10),
+                                          onTap: () => NavigationHelper.push(
+                                            context,
+                                            const RecommendationsScreen(),
+                                          ),
+                                          child: Container(
+                                            decoration: BoxDecoration(
+                                              gradient: LinearGradient(
+                                                colors: pair,
+                                                begin: Alignment.topLeft,
+                                                end: Alignment.bottomRight,
+                                              ),
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                            padding: const EdgeInsets.all(10),
+                                            alignment: Alignment.bottomLeft,
+                                            child: Text(
+                                              cat.title,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                              maxLines: 2,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                        );
+                      },
+                    ),
 
                     if (libraryProvider.recentAlbums.isNotEmpty) ...[
                       HorizontalScrollSection(
