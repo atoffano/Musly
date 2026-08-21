@@ -57,7 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadRecommendations() async {
     try {
       final storageService = Provider.of<StorageService>(context, listen: false);
-      final settings = await storageService.loadSettings();
+      final settings = await storageService.getServerConfig();
       final bridgeUrl = settings?.bridgeUrl;
       if (bridgeUrl != null && bridgeUrl.isNotEmpty) {
         final recProvider = Provider.of<RecommendationsProvider>(context, listen: false);

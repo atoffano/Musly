@@ -30,7 +30,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
 
   Future<void> _loadCategories() async {
     final storageService = Provider.of<StorageService>(context, listen: false);
-    final settings = await storageService.loadSettings();
+    final settings = await storageService.getServerConfig();
     _bridgeUrl = settings?.bridgeUrl;
 
     if (_bridgeUrl == null || _bridgeUrl!.isEmpty) return;
@@ -127,7 +127,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                                   recProvider.loadMoodCategories(_bridgeUrl!)
                               : null,
                           icon: const Icon(Icons.refresh),
-                          label: Text(l10n?.tryAgain ?? 'Try again'),
+                          label: Text(l10n?.retry ?? 'Try again'),
                         ),
                       ],
                     ),
