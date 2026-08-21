@@ -13,6 +13,7 @@ import 'services/audio_handler.dart';
 import 'services/transcoding_service.dart';
 import 'services/local_music_service.dart';
 import 'providers/providers.dart';
+import 'providers/recommendations_provider.dart';
 import 'screens/screens.dart';
 import 'package:dynamic_color/dynamic_color.dart';
 import 'theme/theme.dart';
@@ -116,6 +117,7 @@ void main() async {
           ),
         ),
         ChangeNotifierProvider(create: (_) => LibraryProvider(subsonicService)),
+        ChangeNotifierProvider(create: (_) => RecommendationsProvider()),
       ],
       child: const MuslyApp(),
     );

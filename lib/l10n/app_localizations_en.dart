@@ -39,6 +39,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get madeForYou => 'Made For You';
 
   @override
+  String get recommendations => 'Recommendations';
+
+  @override
   String get topRated => 'Top Rated';
 
   @override

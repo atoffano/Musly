@@ -52,6 +52,11 @@
     "description": "Made for you section title"
   },
 
+  "recommendations": "Recommendations",
+  "@recommendations": {
+    "description": "Recommendations section title in Home screen"
+  },
+
   "topRated": "Top Rated",
   "@topRated": {
     "description": "Top rated albums title"

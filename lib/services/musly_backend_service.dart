@@ -148,11 +148,103 @@ class MuslyBackendService {
     return payload['status']?.toString() == 'removed';
   }
 
-  Future<void> scrobble(String baseUrl, Song song) async {
-    final data = <String, String>{'songId': song.id};
-    if (song.sourceId != null && song.sourceId!.isNotEmpty) {
-      data['videoId'] = song.sourceId!;
-    }
-    await _dio.post('$baseUrl/api/scrobble', data: data);
+  Future<List<MoodSection>> getMoodCategories(String baseUrl) async {
+    final response = await _dio.get('$baseUrl/api/moods');
+    final payload = response.data as Map<String, dynamic>;
+    final sectionsJson = (payload['sections'] as List?) ?? const [];
+    return sectionsJson
+        .map((raw) => MoodSection.fromJson(raw as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<MoodPlaylist>> getMoodPlaylists(
+    String baseUrl,
+    String params,
+  ) async {
+    final response = await _dio.get(
+      '$baseUrl/api/moods/$params',
+    );
+    final payload = response.data as Map<String, dynamic>;
+    final playlistsJson = (payload['playlists'] as List?) ?? const [];
+    return playlistsJson
+        .map((raw) => MoodPlaylist.fromJson(raw as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<Song>> getPlaylistSongs(
+    String baseUrl,
+    String playlistId, {
+    int limit = 50,
+  }) async {
+    final response = await _dio.post(
+      '$baseUrl/api/playlist-songs',
+      data: {'playlistId': playlistId, 'limit': limit},
+    );
+    final payload = response.data as Map<String, dynamic>;
+    final songsJson = (payload['songs'] as List?) ?? const [];
+    return songsJson
+        .map((raw) => Song.fromJson(raw as Map<String, dynamic>))
+        .toList();
   }
 }
+
+class MoodSection {
+  final String name;
+  final List<MoodCategory> categories;
+
+  MoodSection({required this.name, required this.categories});
+
+  factory MoodSection.fromJson(Map<String, dynamic> json) {
+    final cats = (json['categories'] as List?) ?? const [];
+    return MoodSection(
+      name: json['name'] as String? ?? '',
+      categories: cats
+          .map((c) => MoodCategory.fromJson(c as Map<String, dynamic>))
+          .toList(),
+    );
+  }
+}
+
+class MoodCategory {
+  final String params;
+  final String title;
+
+  MoodCategory({required this.params, required this.title});
+
+  factory MoodCategory.fromJson(Map<String, dynamic> json) {
+    return MoodCategory(
+      params: json['params'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+    );
+  }
+}
+
+class MoodPlaylist {
+  final String playlistId;
+  final String title;
+  final String? description;
+  final String? thumbnailUrl;
+
+  MoodPlaylist({
+    required this.playlistId,
+    required this.title,
+    this.description,
+    this.thumbnailUrl,
+  });
+
+  factory MoodPlaylist.fromJson(Map<String, dynamic> json) {
+    String? thumb;
+    final thumbs = json['thumbnails'] as List?;
+    if (thumbs != null && thumbs.isNotEmpty) {
+      final last = thumbs.last as Map<String, dynamic>?;
+      thumb = last?['url'] as String?;
+    }
+    return MoodPlaylist(
+      playlistId: json['playlistId'] as String? ?? '',
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String?,
+      thumbnailUrl: thumb ?? json['thumbnailUrl'] as String?,
+    );
+  }
+}
+
