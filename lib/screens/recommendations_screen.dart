@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../providers/player_provider.dart';
 import '../providers/recommendations_provider.dart';
 import '../services/musly_backend_service.dart';
+import '../services/subsonic_service.dart';
 import '../services/storage_service.dart';
 import '../models/song.dart';
 import '../theme/app_theme.dart';
@@ -25,20 +26,47 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCategories();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadCategories();
+    });
+  }
+
+  String? _resolveBridgeUrl() {
+    if (_bridgeUrl != null && _bridgeUrl!.isNotEmpty) return _bridgeUrl;
+    try {
+      final config = Provider.of<SubsonicService>(context, listen: false).config;
+      return config?.bridgeUrl;
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _loadCategories() async {
+    final directUrl = _resolveBridgeUrl();
+    if (directUrl != null && directUrl.isNotEmpty) {
+      if (mounted) setState(() => _bridgeUrl = directUrl);
+      final recProvider =
+          Provider.of<RecommendationsProvider>(context, listen: false);
+      if (!recProvider.initialized) {
+        await recProvider.loadMoodCategories(directUrl);
+      }
+      return;
+    }
+
     final storageService = Provider.of<StorageService>(context, listen: false);
     final settings = await storageService.getServerConfig();
-    _bridgeUrl = settings?.bridgeUrl;
+    final url = settings?.bridgeUrl;
 
-    if (_bridgeUrl == null || _bridgeUrl!.isEmpty) return;
+    if (mounted) {
+      setState(() => _bridgeUrl = url);
+    }
+
+    if (url == null || url.isEmpty) return;
 
     final recProvider =
         Provider.of<RecommendationsProvider>(context, listen: false);
     if (!recProvider.initialized) {
-      await recProvider.loadMoodCategories(_bridgeUrl!);
+      await recProvider.loadMoodCategories(url);
     }
   }
 
@@ -47,30 +75,26 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final l10n = AppLocalizations.of(context);
+    final effectiveBridgeUrl = _bridgeUrl ?? _resolveBridgeUrl() ?? '';
 
     return Scaffold(
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             pinned: true,
-            expandedHeight: 140,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                l10n?.recommendations ?? 'Browse YT Music',
-                style: theme.appBarTheme.titleTextStyle,
-              ),
-              titlePadding: const EdgeInsets.only(left: 52, bottom: 16),
+            title: Text(
+              l10n?.recommendations ?? 'Recommendations',
             ),
             actions: [
               IconButton(
                 icon: const Icon(CupertinoIcons.refresh),
-                onPressed: _bridgeUrl != null
+                onPressed: effectiveBridgeUrl.isNotEmpty
                     ? () {
                         final recProvider =
                             Provider.of<RecommendationsProvider>(
                                 context,
                                 listen: false);
-                        recProvider.loadMoodCategories(_bridgeUrl!);
+                        recProvider.loadMoodCategories(effectiveBridgeUrl);
                       }
                     : null,
                 tooltip: 'Refresh',
@@ -122,9 +146,9 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                             textAlign: TextAlign.center),
                         const SizedBox(height: 24),
                         ElevatedButton.icon(
-                          onPressed: _bridgeUrl != null
+                          onPressed: effectiveBridgeUrl.isNotEmpty
                               ? () =>
-                                  recProvider.loadMoodCategories(_bridgeUrl!)
+                                  recProvider.loadMoodCategories(effectiveBridgeUrl)
                               : null,
                           icon: const Icon(Icons.refresh),
                           label: Text(l10n?.retry ?? 'Try again'),
@@ -162,7 +186,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
                     final section = recProvider.sections[index];
                     return _MoodSectionWidget(
                       section: section,
-                      bridgeUrl: _bridgeUrl!,
+                      bridgeUrl: effectiveBridgeUrl,
                       isDark: isDark,
                     );
                   },
@@ -311,6 +335,16 @@ class _MoodPlaylistsScreenState extends State<_MoodPlaylistsScreen> {
   bool _isLoading = true;
   String? _error;
 
+  String _getEffectiveBridgeUrl() {
+    if (widget.bridgeUrl.isNotEmpty) return widget.bridgeUrl;
+    try {
+      final config = Provider.of<SubsonicService>(context, listen: false).config;
+      return config?.bridgeUrl ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -318,6 +352,15 @@ class _MoodPlaylistsScreenState extends State<_MoodPlaylistsScreen> {
   }
 
   Future<void> _loadPlaylists() async {
+    final bridgeUrl = _getEffectiveBridgeUrl();
+    if (bridgeUrl.isEmpty) {
+      setState(() {
+        _isLoading = false;
+        _error = 'Bridge server unavailable';
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -325,7 +368,7 @@ class _MoodPlaylistsScreenState extends State<_MoodPlaylistsScreen> {
 
     try {
       _playlists = await _backend.getMoodPlaylists(
-        widget.bridgeUrl,
+        bridgeUrl,
         widget.categoryParams,
       );
     } catch (e) {
@@ -341,20 +384,14 @@ class _MoodPlaylistsScreenState extends State<_MoodPlaylistsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
+    final effectiveBridgeUrl = _getEffectiveBridgeUrl();
 
     return Scaffold(
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
             pinned: true,
-            expandedHeight: 140,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                widget.categoryTitle,
-                style: theme.appBarTheme.titleTextStyle,
-              ),
-              titlePadding: const EdgeInsets.only(left: 52, bottom: 16),
-            ),
+            title: Text(widget.categoryTitle),
           ),
           if (_isLoading)
             SliverToBoxAdapter(
@@ -408,7 +445,7 @@ class _MoodPlaylistsScreenState extends State<_MoodPlaylistsScreen> {
                           builder: (_) => _PlaylistSongsScreen(
                             playlistTitle: playlist.title,
                             playlistId: playlist.playlistId,
-                            bridgeUrl: widget.bridgeUrl,
+                            bridgeUrl: effectiveBridgeUrl,
                             thumbnailUrl: playlist.thumbnailUrl,
                           ),
                         ),
@@ -540,6 +577,16 @@ class _PlaylistSongsScreenState extends State<_PlaylistSongsScreen> {
   bool _isLoading = true;
   String? _error;
 
+  String _getEffectiveBridgeUrl() {
+    if (widget.bridgeUrl.isNotEmpty) return widget.bridgeUrl;
+    try {
+      final config = Provider.of<SubsonicService>(context, listen: false).config;
+      return config?.bridgeUrl ?? '';
+    } catch (_) {
+      return '';
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -547,6 +594,15 @@ class _PlaylistSongsScreenState extends State<_PlaylistSongsScreen> {
   }
 
   Future<void> _loadSongs() async {
+    final bridgeUrl = _getEffectiveBridgeUrl();
+    if (bridgeUrl.isEmpty) {
+      setState(() {
+        _isLoading = false;
+        _error = 'Bridge server unavailable';
+      });
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _error = null;
@@ -554,7 +610,7 @@ class _PlaylistSongsScreenState extends State<_PlaylistSongsScreen> {
 
     try {
       _songs = await _backend.getPlaylistSongs(
-        widget.bridgeUrl,
+        bridgeUrl,
         widget.playlistId,
       );
     } catch (e) {
@@ -589,17 +645,18 @@ class _PlaylistSongsScreenState extends State<_PlaylistSongsScreen> {
         slivers: [
           SliverAppBar(
             pinned: true,
-            expandedHeight: 200,
-            flexibleSpace: FlexibleSpaceBar(
-              title: Text(
-                widget.playlistTitle,
-                style: theme.appBarTheme.titleTextStyle?.copyWith(fontSize: 16),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              titlePadding: const EdgeInsets.only(left: 52, bottom: 16),
-              background: widget.thumbnailUrl != null
-                  ? Stack(
+            expandedHeight: widget.thumbnailUrl != null ? 200 : null,
+            title: widget.thumbnailUrl == null ? Text(widget.playlistTitle) : null,
+            flexibleSpace: widget.thumbnailUrl != null
+                ? FlexibleSpaceBar(
+                    title: Text(
+                      widget.playlistTitle,
+                      style: theme.appBarTheme.titleTextStyle?.copyWith(fontSize: 16),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    titlePadding: const EdgeInsets.only(left: 52, bottom: 16, right: 16),
+                    background: Stack(
                       fit: StackFit.expand,
                       children: [
                         CachedNetworkImage(
@@ -620,9 +677,9 @@ class _PlaylistSongsScreenState extends State<_PlaylistSongsScreen> {
                           ),
                         ),
                       ],
-                    )
-                  : null,
-            ),
+                    ),
+                  )
+                : null,
           ),
           if (_isLoading)
             SliverToBoxAdapter(
