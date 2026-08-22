@@ -782,7 +782,11 @@ class LibraryProvider extends ChangeNotifier {
 
   String? _bridgeBaseUrl() {
     final config = _subsonicService.config;
-    if (config == null || config.serverUrl.isEmpty) {
+    if (config == null) return null;
+    if (config.bridgeUrl != null && config.bridgeUrl!.trim().isNotEmpty) {
+      return config.bridgeUrl!.trim();
+    }
+    if (config.serverUrl.isEmpty) {
       return null;
     }
     final uri = Uri.tryParse(config.serverUrl);
