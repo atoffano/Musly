@@ -156,65 +156,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     const SizedBox(height: 24),
 
-                    if (recommendationService.enabled &&
-                        personalizedFeed.isNotEmpty) ...[
-                      _SectionTitle(title: AppLocalizations.of(context)!.forYou, icon: Icons.stars_rounded, hPad: hPad),
-                      if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
-                      ...personalizedFeed.take(5).map((song) {
-                        if (isDesktop) return _DesktopSongRow(song: song, playlist: personalizedFeed, index: personalizedFeed.indexOf(song), hPad: hPad);
-                        return SongTile(song: song, playlist: personalizedFeed, index: personalizedFeed.indexOf(song), showAlbum: true);
-                      }),
-                      const SizedBox(height: 24),
-                    ],
-
-                    if (mixes.containsKey('Quick Picks')) ...[
-                      _SectionTitle(title: AppLocalizations.of(context)!.quickPicks, icon: Icons.bolt_rounded, hPad: hPad),
-                      if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
-                      ...mixes['Quick Picks']!.take(5).map((song) {
-                        if (isDesktop) return _DesktopSongRow(song: song, playlist: mixes['Quick Picks']!, index: mixes['Quick Picks']!.indexOf(song), hPad: hPad);
-                        return SongTile(song: song, playlist: mixes['Quick Picks']!, index: mixes['Quick Picks']!.indexOf(song), showAlbum: true);
-                      }),
-                      const SizedBox(height: 24),
-                    ],
-
-                    if (mixes.containsKey('Discover Mix')) ...[
-                      _SectionTitle(title: AppLocalizations.of(context)!.discoverMix, icon: Icons.explore_rounded, hPad: hPad),
-                      if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
-                      ...mixes['Discover Mix']!.take(5).map((song) {
-                        if (isDesktop) return _DesktopSongRow(song: song, playlist: mixes['Discover Mix']!, index: mixes['Discover Mix']!.indexOf(song), hPad: hPad);
-                        return SongTile(song: song, playlist: mixes['Discover Mix']!, index: mixes['Discover Mix']!.indexOf(song), showAlbum: true);
-                      }),
-                      const SizedBox(height: 24),
-                    ],
-
-                    for (final entry in mixes.entries.where(
-                      (e) =>
-                          e.key != 'Quick Picks' &&
-                          e.key != 'Discover Mix' &&
-                          !e.key.contains('Vibes'),
-                    )) ...[
-                      _SectionTitle(title: entry.key, icon: Icons.album_rounded, hPad: hPad),
-                      if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
-                      ...entry.value.take(5).map((song) {
-                        if (isDesktop) return _DesktopSongRow(song: song, playlist: entry.value, index: entry.value.indexOf(song), hPad: hPad);
-                        return SongTile(song: song, playlist: entry.value, index: entry.value.indexOf(song), showAlbum: true);
-                      }),
-                      const SizedBox(height: 24),
-                    ],
-
-                    for (final entry in mixes.entries.where(
-                      (e) => e.key.contains('Vibes'),
-                    )) ...[
-                      _SectionTitle(title: entry.key, icon: Icons.nightlight_round, hPad: hPad),
-                      if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
-                      ...entry.value.take(5).map((song) {
-                        if (isDesktop) return _DesktopSongRow(song: song, playlist: entry.value, index: entry.value.indexOf(song), hPad: hPad);
-                        return SongTile(song: song, playlist: entry.value, index: entry.value.indexOf(song), showAlbum: true);
-                      }),
-                      const SizedBox(height: 24),
-                    ],
-
-                    // YT Music Moods & Genres section
+                    // YT Music Moods & Genres recommendations section
                     Consumer<RecommendationsProvider>(
                       builder: (context, recProvider, _) {
                         if (recProvider.loading || !recProvider.hasData) {
@@ -314,6 +256,64 @@ class _HomeScreenState extends State<HomeScreen> {
                         );
                       },
                     ),
+
+                    if (recommendationService.enabled &&
+                        personalizedFeed.isNotEmpty) ...[
+                      _SectionTitle(title: AppLocalizations.of(context)!.forYou, icon: Icons.stars_rounded, hPad: hPad),
+                      if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
+                      ...personalizedFeed.take(5).map((song) {
+                        if (isDesktop) return _DesktopSongRow(song: song, playlist: personalizedFeed, index: personalizedFeed.indexOf(song), hPad: hPad);
+                        return SongTile(song: song, playlist: personalizedFeed, index: personalizedFeed.indexOf(song), showAlbum: true);
+                      }),
+                      const SizedBox(height: 24),
+                    ],
+
+                    if (mixes.containsKey('Quick Picks')) ...[
+                      _SectionTitle(title: AppLocalizations.of(context)!.quickPicks, icon: Icons.bolt_rounded, hPad: hPad),
+                      if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
+                      ...mixes['Quick Picks']!.take(5).map((song) {
+                        if (isDesktop) return _DesktopSongRow(song: song, playlist: mixes['Quick Picks']!, index: mixes['Quick Picks']!.indexOf(song), hPad: hPad);
+                        return SongTile(song: song, playlist: mixes['Quick Picks']!, index: mixes['Quick Picks']!.indexOf(song), showAlbum: true);
+                      }),
+                      const SizedBox(height: 24),
+                    ],
+
+                    if (mixes.containsKey('Discover Mix')) ...[
+                      _SectionTitle(title: AppLocalizations.of(context)!.discoverMix, icon: Icons.explore_rounded, hPad: hPad),
+                      if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
+                      ...mixes['Discover Mix']!.take(5).map((song) {
+                        if (isDesktop) return _DesktopSongRow(song: song, playlist: mixes['Discover Mix']!, index: mixes['Discover Mix']!.indexOf(song), hPad: hPad);
+                        return SongTile(song: song, playlist: mixes['Discover Mix']!, index: mixes['Discover Mix']!.indexOf(song), showAlbum: true);
+                      }),
+                      const SizedBox(height: 24),
+                    ],
+
+                    for (final entry in mixes.entries.where(
+                      (e) =>
+                          e.key != 'Quick Picks' &&
+                          e.key != 'Discover Mix' &&
+                          !e.key.contains('Vibes'),
+                    )) ...[
+                      _SectionTitle(title: entry.key, icon: Icons.album_rounded, hPad: hPad),
+                      if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
+                      ...entry.value.take(5).map((song) {
+                        if (isDesktop) return _DesktopSongRow(song: song, playlist: entry.value, index: entry.value.indexOf(song), hPad: hPad);
+                        return SongTile(song: song, playlist: entry.value, index: entry.value.indexOf(song), showAlbum: true);
+                      }),
+                      const SizedBox(height: 24),
+                    ],
+
+                    for (final entry in mixes.entries.where(
+                      (e) => e.key.contains('Vibes'),
+                    )) ...[
+                      _SectionTitle(title: entry.key, icon: Icons.nightlight_round, hPad: hPad),
+                      if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
+                      ...entry.value.take(5).map((song) {
+                        if (isDesktop) return _DesktopSongRow(song: song, playlist: entry.value, index: entry.value.indexOf(song), hPad: hPad);
+                        return SongTile(song: song, playlist: entry.value, index: entry.value.indexOf(song), showAlbum: true);
+                      }),
+                      const SizedBox(height: 24),
+                    ],
 
                     if (libraryProvider.recentAlbums.isNotEmpty) ...[
                       HorizontalScrollSection(
