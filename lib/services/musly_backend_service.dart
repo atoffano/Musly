@@ -103,7 +103,13 @@ class MuslyBackendService {
       '$baseUrl/api/stream',
       data: {'videoId': videoId},
     );
-    return (response.data as Map<String, dynamic>)['streamUrl'] as String;
+    final rawUrl = (response.data as Map<String, dynamic>)['streamUrl'] as String;
+    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
+      return rawUrl;
+    }
+    final cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
+    final cleanPath = rawUrl.startsWith('/') ? rawUrl : '/$rawUrl';
+    return '$cleanBase$cleanPath';
   }
 
   Future<SaveResult> saveSong(
