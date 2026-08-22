@@ -229,6 +229,12 @@ class _HomeScreenState extends State<HomeScreen> {
                           if (previewCats.length >= 8) break;
                         }
                         if (previewCats.isEmpty) return const SizedBox.shrink();
+                        final effectiveBridgeUrl = Provider.of<SubsonicService>(
+                                  context,
+                                  listen: false,
+                                ).config?.bridgeUrl ??
+                            '';
+
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -268,7 +274,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                           borderRadius: BorderRadius.circular(10),
                                           onTap: () => NavigationHelper.push(
                                             context,
-                                            const RecommendationsScreen(),
+                                            MoodPlaylistsScreen(
+                                              categoryTitle: cat.title,
+                                              categoryParams: cat.params,
+                                              bridgeUrl: effectiveBridgeUrl,
+                                            ),
                                           ),
                                           child: Container(
                                             decoration: BoxDecoration(

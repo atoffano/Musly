@@ -269,7 +269,7 @@ class _MoodSectionWidget extends StatelessWidget {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => _MoodPlaylistsScreen(
+                            builder: (_) => MoodPlaylistsScreen(
                               categoryTitle: cat.title,
                               categoryParams: cat.params,
                               bridgeUrl: bridgeUrl,
@@ -314,22 +314,23 @@ class _MoodSectionWidget extends StatelessWidget {
 }
 
 /// Second-level screen – playlists for a mood/genre category.
-class _MoodPlaylistsScreen extends StatefulWidget {
+class MoodPlaylistsScreen extends StatefulWidget {
   final String categoryTitle;
   final String categoryParams;
   final String bridgeUrl;
 
-  const _MoodPlaylistsScreen({
+  const MoodPlaylistsScreen({
+    super.key,
     required this.categoryTitle,
     required this.categoryParams,
-    required this.bridgeUrl,
+    this.bridgeUrl = '',
   });
 
   @override
-  State<_MoodPlaylistsScreen> createState() => _MoodPlaylistsScreenState();
+  State<MoodPlaylistsScreen> createState() => _MoodPlaylistsScreenState();
 }
 
-class _MoodPlaylistsScreenState extends State<_MoodPlaylistsScreen> {
+class _MoodPlaylistsScreenState extends State<MoodPlaylistsScreen> {
   final MuslyBackendService _backend = MuslyBackendService();
   List<MoodPlaylist> _playlists = [];
   bool _isLoading = true;
@@ -442,7 +443,7 @@ class _MoodPlaylistsScreenState extends State<_MoodPlaylistsScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (_) => _PlaylistSongsScreen(
+                          builder: (_) => PlaylistSongsScreen(
                             playlistTitle: playlist.title,
                             playlistId: playlist.playlistId,
                             bridgeUrl: effectiveBridgeUrl,
@@ -554,24 +555,25 @@ class _PlaylistTile extends StatelessWidget {
 }
 
 /// Third-level screen – streamable, saveable songs from a YT playlist.
-class _PlaylistSongsScreen extends StatefulWidget {
+class PlaylistSongsScreen extends StatefulWidget {
   final String playlistTitle;
   final String playlistId;
   final String bridgeUrl;
   final String? thumbnailUrl;
 
-  const _PlaylistSongsScreen({
+  const PlaylistSongsScreen({
+    super.key,
     required this.playlistTitle,
     required this.playlistId,
-    required this.bridgeUrl,
+    this.bridgeUrl = '',
     this.thumbnailUrl,
   });
 
   @override
-  State<_PlaylistSongsScreen> createState() => _PlaylistSongsScreenState();
+  State<PlaylistSongsScreen> createState() => _PlaylistSongsScreenState();
 }
 
-class _PlaylistSongsScreenState extends State<_PlaylistSongsScreen> {
+class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
   final MuslyBackendService _backend = MuslyBackendService();
   List<Song> _songs = [];
   bool _isLoading = true;
