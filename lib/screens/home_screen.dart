@@ -10,6 +10,7 @@ import '../providers/recommendations_provider.dart';
 import '../services/subsonic_service.dart';
 import '../services/storage_service.dart';
 import '../services/recommendation_service.dart';
+import '../services/musly_backend_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/navigation_helper.dart';
 import '../widgets/widgets.dart';
