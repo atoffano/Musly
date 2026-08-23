@@ -117,6 +117,8 @@ class LibraryProvider extends ChangeNotifier {
   List<Album> get cachedAllAlbums => _cachedAllAlbums;
   List<Song> get cachedAllSongs => _cachedAllSongs;
 
+  final Set<String> _savedYouTubeKeys = {};
+
   String? _youtubeKeyFromSong(Song song) {
     final sourceId =
         song.sourceId ?? (song.id.startsWith('yt:') ? song.id.substring(3) : null);
@@ -127,6 +129,9 @@ class LibraryProvider extends ChangeNotifier {
   }
 
   bool isYouTubeSavedInLibraryByKey(String key) {
+    if (_savedYouTubeKeys.contains(key)) {
+      return true;
+    }
     return _cachedAllSongs.any((song) {
       final songKey = _youtubeKeyFromSong(song);
       return songKey == key;
@@ -845,6 +850,11 @@ class LibraryProvider extends ChangeNotifier {
   }
 
   void updateYouTubeSavedState(String sourceId, bool saved) {
+    if (saved) {
+      _savedYouTubeKeys.add(sourceId);
+    } else {
+      _savedYouTubeKeys.remove(sourceId);
+    }
     bool changed = false;
 
     Song patch(Song song) {
@@ -869,9 +879,7 @@ class LibraryProvider extends ChangeNotifier {
             songs: _starred!.songs.map(patch).toList(),
           );
 
-    if (changed) {
-      notifyListeners();
-    }
+    notifyListeners();
   }
 
   Future<List<Song>> getSongsByGenre(String genre) async {

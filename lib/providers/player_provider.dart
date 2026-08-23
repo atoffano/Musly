@@ -722,23 +722,15 @@ class PlayerProvider extends ChangeNotifier {
       return song.saved;
     }
 
-    final library = _libraryProvider;
-    final hasAuthoritativeLibrarySnapshot =
-      library != null && (library.isInitialized || library.cachedAllSongs.isNotEmpty);
-    final librarySaved = hasAuthoritativeLibrarySnapshot
-      ? (library?.isYouTubeSavedInLibraryByKey(key) ?? false)
-      : song.saved;
-
-    if (_youtubeSaveLocks.contains(key)) {
-      return _youtubeSavedOverrides[key] ?? librarySaved;
+    if (_youtubeSavedOverrides.containsKey(key)) {
+      return _youtubeSavedOverrides[key]!;
     }
 
-    final override = _youtubeSavedOverrides[key];
-    if (override != null && override != librarySaved) {
-      _youtubeSavedOverrides[key] = librarySaved;
+    if (_libraryProvider != null && _libraryProvider!.isYouTubeSavedInLibraryByKey(key)) {
+      return true;
     }
 
-    return librarySaved;
+    return song.saved;
   }
 
   YouTubeSaveState youtubeSaveState(Song song) {
@@ -1741,24 +1733,13 @@ class PlayerProvider extends ChangeNotifier {
 
         if (status == 'ready') {
           timer.cancel();
-          if (targetSaved) {
-            await _libraryProvider?.refreshAllSongsCache();
-          }
-          final savedInLibrary = targetSaved
-              ? (_libraryProvider?.isYouTubeSavedInLibraryByKey(key) ?? true)
-              : false;
-
-          _youtubeSaveStates[key] = savedInLibrary
-              ? YouTubeSaveState.ready
-              : YouTubeSaveState.error;
-          _youtubeSavedOverrides[key] = savedInLibrary;
-          _syncCurrentSongYoutubeState(song, savedInLibrary);
-          _libraryProvider?.updateYouTubeSavedState(key, savedInLibrary);
-          if (!savedInLibrary) {
-            _youtubeSaveErrors[key] =
-                'Save job completed but the song is not present in library';
-          }
+          _youtubeSavedOverrides[key] = true;
+          _youtubeSaveStates[key] = YouTubeSaveState.ready;
+          _syncCurrentSongYoutubeState(song, true);
+          _libraryProvider?.updateYouTubeSavedState(key, true);
+          _libraryProvider?.refreshAllSongsCache();
           _finishYouTubeSaveAction(key);
+          notifyListeners();
           return;
         }
 
