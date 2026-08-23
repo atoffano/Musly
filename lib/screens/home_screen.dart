@@ -56,16 +56,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _resolveBridgeUrl() {
-    final direct =
-        Provider.of<SubsonicService>(context, listen: false).config?.bridgeUrl;
-    if (direct != null && direct.isNotEmpty) return direct;
     final subsonic = Provider.of<SubsonicService>(context, listen: false);
-    final baseUrl = subsonic.baseUrl;
-    if (baseUrl != null && baseUrl.isNotEmpty) {
-      final uri = Uri.parse(baseUrl);
-      if (uri.hasPort) {
-        return '${uri.scheme}://${uri.host}:8788';
-      }
+    final direct = subsonic.config?.bridgeUrl;
+    if (direct != null && direct.isNotEmpty) return direct;
+    final serverUrl = subsonic.config?.normalizedUrl ?? subsonic.config?.serverUrl;
+    if (serverUrl != null && serverUrl.isNotEmpty) {
+      try {
+        final uri = Uri.parse(serverUrl);
+        if (uri.host.isNotEmpty) {
+          return '${uri.scheme}://${uri.host}:8788';
+        }
+      } catch (_) {}
     }
     return '';
   }
