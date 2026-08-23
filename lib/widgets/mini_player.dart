@@ -250,20 +250,87 @@ class _MiniPlayerControls extends StatelessWidget {
 
   const _MiniPlayerControls({this.isRadio = false});
 
+  bool _canToggleLibrarySaved(Song? song) {
+    if (song == null) return false;
+    return song.isYouTube ||
+        (song.sourceId != null && song.sourceId!.isNotEmpty) ||
+        song.id.startsWith('yt:');
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final color = isDark ? Colors.white : Colors.black;
 
-    return Selector<PlayerProvider, (bool, bool)>(
-      selector: (_, p) => (p.isPlaying, p.hasNext),
+    return Selector<PlayerProvider, (bool, bool, Song?)>(
+      selector: (_, p) => (p.isPlaying, p.hasNext, p.currentSong),
       builder: (context, data, _) {
-        final (isPlaying, hasNext) = data;
+        final (isPlaying, hasNext, currentSong) = data;
         final provider = context.read<PlayerProvider>();
+        final canSave = !isRadio && _canToggleLibrarySaved(currentSong);
 
         return Row(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (canSave && currentSong != null)
+              Selector<PlayerProvider, ({bool saved, bool busy})>(
+                selector: (_, p) => (
+                  saved: p.isYouTubeSaved(currentSong),
+                  busy: p.isYouTubeSaveBusy(currentSong),
+                ),
+                builder: (context, state, _) {
+                  return IconButton(
+                    iconSize: 24,
+                    padding: const EdgeInsets.symmetric(horizontal: 4),
+                    constraints: const BoxConstraints(),
+                    tooltip: state.saved ? 'Remove from library' : 'Save to library',
+                    onPressed: state.busy
+                        ? null
+                        : () async {
+                            final messenger = ScaffoldMessenger.of(context);
+                            try {
+                              await provider.toggleYouTubeSaved(currentSong);
+                              if (!context.mounted) return;
+                              final nowSaved = provider.isYouTubeSaved(currentSong);
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    nowSaved
+                                        ? 'Saving to library started'
+                                        : 'Removed from library',
+                                  ),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            } catch (e) {
+                              if (!context.mounted) return;
+                              messenger.showSnackBar(
+                                SnackBar(
+                                  content: Text('Save action failed: $e'),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            }
+                          },
+                    icon: state.busy
+                        ? SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: color,
+                            ),
+                          )
+                        : Icon(
+                            state.saved
+                                ? Icons.check_circle_rounded
+                                : Icons.add_circle_outline_rounded,
+                            color: state.saved ? const Color(0xFF1DB954) : color,
+                            size: 26,
+                          ),
+                  );
+                },
+              ),
             IconButton(
               onPressed: provider.togglePlayPause,
               icon: Icon(
@@ -272,7 +339,6 @@ class _MiniPlayerControls extends StatelessWidget {
               ),
               color: color,
             ),
-            
             if (!isRadio)
               IconButton(
                 onPressed: hasNext ? provider.skipNext : null,

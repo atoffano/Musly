@@ -315,12 +315,15 @@ class _DesktopPlayerBarState extends State<DesktopPlayerBar> {
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
                             : Icon(
-                                state.saved ? Icons.check_circle : Icons.add_circle_outline,
+                                state.saved
+                                    ? Icons.check_circle_rounded
+                                    : Icons.add_circle_outline_rounded,
                                 size: 20,
                                 color: state.saved
-                                    ? Colors.green
+                                    ? const Color(0xFF1DB954)
                                     : (isDark ? const Color(0xFFB3B3B3) : const Color(0xFF6B6B6B)),
                               ),
+
                         tooltip: state.saved ? 'Remove from Library' : 'Add to Library',
                       );
                     },

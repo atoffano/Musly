@@ -247,13 +247,14 @@ class SongTile extends StatelessWidget {
                           }
                         },
                         icon: Icon(
-                          state.saved ? Icons.check_circle : Icons.add_circle_outline,
+                          state.saved ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,
                           size: 18,
                           color: state.saved
-                              ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.9)
+                              ? const Color(0xFF1DB954)
                               : Theme.of(context).textTheme.bodySmall?.color,
                         ),
                       ),
+
               );
             },
           )
@@ -398,9 +399,10 @@ class _SongOptionsSheetState extends State<_SongOptionsSheet> {
                         ),
                         builder: (context, state, _) {
                           return _OptionTile(
-                            icon: state.saved ? Icons.check_circle : Icons.add_circle_outline,
+                            icon: state.saved ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,
                             title: state.saved ? 'Remove from Library' : 'Add to Library',
-                            iconColor: state.saved ? Theme.of(context).colorScheme.primary : null,
+                            iconColor: state.saved ? const Color(0xFF1DB954) : null,
+
                             enabled: !state.busy,
                             trailing: state.busy
                                 ? const SizedBox(

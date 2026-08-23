@@ -29,7 +29,7 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
   List<Song> _sortedSongs = [];
   bool _isLoading = true;
   final ScrollController _scrollController = ScrollController();
-  SongSortOption _currentSort = SongSortOption.titleAsc;
+  SongSortOption _currentSort = SongSortOption.recentlyAdded;
 
   @override
   void initState() {
@@ -123,46 +123,45 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
 
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       backgroundColor: isDark ? AppTheme.darkCard : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.grey[400],
-                borderRadius: BorderRadius.circular(2),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 8),
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Sort By',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: isDark ? Colors.white : Colors.black,
+              const SizedBox(height: 16),
+              Text(
+                'Sort By',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : Colors.black,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            _buildSortOption('Title (A-Z)', SongSortOption.titleAsc, isDark),
-            _buildSortOption('Title (Z-A)', SongSortOption.titleDesc, isDark),
-            _buildSortOption('Artist (A-Z)', SongSortOption.artistAsc, isDark),
-            _buildSortOption('Artist (Z-A)', SongSortOption.artistDesc, isDark),
-            _buildSortOption('Album (A-Z)', SongSortOption.albumAsc, isDark),
-            _buildSortOption('Album (Z-A)', SongSortOption.albumDesc, isDark),
-            _buildSortOption(
-              'Recently Added',
-              SongSortOption.recentlyAdded,
-              isDark,
-            ),
-            const SizedBox(height: 16),
-          ],
+              const SizedBox(height: 8),
+              _buildSortOption('Recently Added', SongSortOption.recentlyAdded, isDark),
+              _buildSortOption('Title (A-Z)', SongSortOption.titleAsc, isDark),
+              _buildSortOption('Title (Z-A)', SongSortOption.titleDesc, isDark),
+              _buildSortOption('Artist (A-Z)', SongSortOption.artistAsc, isDark),
+              _buildSortOption('Artist (Z-A)', SongSortOption.artistDesc, isDark),
+              _buildSortOption('Album (A-Z)', SongSortOption.albumAsc, isDark),
+              _buildSortOption('Album (Z-A)', SongSortOption.albumDesc, isDark),
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );
@@ -170,18 +169,19 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
 
   Widget _buildSortOption(String title, SongSortOption option, bool isDark) {
     final isSelected = _currentSort == option;
+    final primaryColor = Theme.of(context).colorScheme.primary;
     return ListTile(
       title: Text(
         title,
         style: TextStyle(
           color: isSelected
-              ? AppTheme.appleMusicRed
+              ? primaryColor
               : (isDark ? Colors.white : Colors.black),
           fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
         ),
       ),
       trailing: isSelected
-          ? Icon(Icons.check, color: AppTheme.appleMusicRed)
+          ? Icon(Icons.check, color: primaryColor)
           : null,
       onTap: () {
         Navigator.pop(context);

@@ -65,8 +65,10 @@ extension AccentColorExt on AccentColor {
         return AccentColor.blue;
       case 'purple':
         return AccentColor.purple;
-      default:
+      case 'red':
         return AccentColor.red;
+      default:
+        return AccentColor.green;
     }
   }
 }
@@ -76,8 +78,8 @@ class ThemeService extends ChangeNotifier {
   static const String _keyAccentColor = 'app_accent_color';
   static const String _keyLiquidGlass = 'app_liquid_glass';
 
-  ThemeMode _themeMode = ThemeMode.system;
-  AccentColor _accentColor = AccentColor.red;
+  ThemeMode _themeMode = ThemeMode.dark;
+  AccentColor _accentColor = AccentColor.green;
   bool _liquidGlass = false;
 
   ThemeMode get themeMode => _themeMode;
@@ -87,10 +89,10 @@ class ThemeService extends ChangeNotifier {
   Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
 
-    final modeKey = prefs.getString(_keyThemeMode) ?? 'system';
+    final modeKey = prefs.getString(_keyThemeMode) ?? 'dark';
     _themeMode = _themeModeFromKey(modeKey);
 
-    final colorKey = prefs.getString(_keyAccentColor) ?? 'red';
+    final colorKey = prefs.getString(_keyAccentColor) ?? 'green';
     _accentColor = AccentColorExt.fromKey(colorKey);
 
     _liquidGlass = prefs.getBool(_keyLiquidGlass) ?? false;
@@ -121,10 +123,11 @@ class ThemeService extends ChangeNotifier {
     switch (key) {
       case 'light':
         return ThemeMode.light;
-      case 'dark':
-        return ThemeMode.dark;
-      default:
+      case 'system':
         return ThemeMode.system;
+      case 'dark':
+      default:
+        return ThemeMode.dark;
     }
   }
 
@@ -132,10 +135,12 @@ class ThemeService extends ChangeNotifier {
     switch (mode) {
       case ThemeMode.light:
         return 'light';
-      case ThemeMode.dark:
-        return 'dark';
-      default:
+      case ThemeMode.system:
         return 'system';
+      case ThemeMode.dark:
+      default:
+        return 'dark';
     }
   }
 }
+

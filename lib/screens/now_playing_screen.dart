@@ -1982,7 +1982,7 @@ class _SongInfoState extends State<_SongInfo> {
                       )
                     : Icon(
                         state.saved ? CupertinoIcons.check_mark_circled_solid : CupertinoIcons.plus_circle,
-                        color: state.saved ? const Color(0xFF66BB6A) : Colors.white,
+                        color: state.saved ? const Color(0xFF1DB954) : Colors.white,
                         size: 26,
                       ),
               );
@@ -2001,7 +2001,7 @@ class _SongInfoState extends State<_SongInfo> {
               onPressed: () => _toggleFavorite(context),
               icon: Icon(
                 isStarred ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
-                color: isStarred ? AppTheme.appleMusicRed : Colors.white,
+                color: isStarred ? Theme.of(context).colorScheme.primary : Colors.white,
                 size: 26,
               ),
             );

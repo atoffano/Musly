@@ -30,9 +30,10 @@ class AppTheme {
   static ThemeData darkThemeFromScheme(ColorScheme scheme) =>
       _buildFromScheme(scheme);
 
-  static ThemeData get lightTheme => _buildLightTheme(appleMusicRed);
+  static ThemeData get lightTheme => _buildLightTheme(spotifyGreen);
 
-  static ThemeData get darkTheme => _buildDarkTheme(appleMusicRed);
+  static ThemeData get darkTheme => _buildDarkTheme(spotifyGreen);
+
 
   static ThemeData _buildLightTheme(Color accent) => ThemeData(
     useMaterial3: true,
