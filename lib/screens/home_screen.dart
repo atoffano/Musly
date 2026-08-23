@@ -55,22 +55,41 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadRecommendations();
   }
 
+  String _resolveBridgeUrl() {
+    final direct =
+        Provider.of<SubsonicService>(context, listen: false).config?.bridgeUrl;
+    if (direct != null && direct.isNotEmpty) return direct;
+    final subsonic = Provider.of<SubsonicService>(context, listen: false);
+    final baseUrl = subsonic.baseUrl;
+    if (baseUrl != null && baseUrl.isNotEmpty) {
+      final uri = Uri.parse(baseUrl);
+      if (uri.hasPort) {
+        return '${uri.scheme}://${uri.host}:8788';
+      }
+    }
+    return '';
+  }
+
   Future<void> _loadRecommendations() async {
     try {
       final directUrl = Provider.of<SubsonicService>(context, listen: false).config?.bridgeUrl;
-      final bridgeUrl = directUrl ??
-          (await Provider.of<StorageService>(context, listen: false).getServerConfig())?.bridgeUrl;
-      if (bridgeUrl != null && bridgeUrl.isNotEmpty) {
+      final serverConfigUrl = (await Provider.of<StorageService>(context, listen: false).getServerConfig())?.bridgeUrl;
+      final fallbackUrl = _resolveBridgeUrl();
+      final bridgeUrl = (directUrl != null && directUrl.isNotEmpty)
+          ? directUrl
+          : ((serverConfigUrl != null && serverConfigUrl.isNotEmpty) ? serverConfigUrl : fallbackUrl);
+
+      if (bridgeUrl.isNotEmpty) {
         final recProvider = Provider.of<RecommendationsProvider>(context, listen: false);
         if (!recProvider.initialized) {
-          await recProvider.loadMoodCategories(bridgeUrl);
+          recProvider.loadMoodCategories(bridgeUrl);
         }
         if (!recProvider.featuredInitialized) {
-          await recProvider.loadFeaturedPlaylists(bridgeUrl);
+          recProvider.loadFeaturedPlaylists(bridgeUrl);
         }
       }
     } catch (e) {
-      // Silently fail — recommendations are optional
+      debugPrint('Failed to load recommendations on home screen: $e');
     }
   }
 
@@ -203,11 +222,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           return const SizedBox.shrink();
                         }
 
-                        final effectiveBridgeUrl = Provider.of<SubsonicService>(
-                                  context,
-                                  listen: false,
-                                ).config?.bridgeUrl ??
-                            '';
+                        final effectiveBridgeUrl = _resolveBridgeUrl();
+
 
                         final cardSize = isDesktop ? 160.0 : 130.0;
                         final totalHeight = cardSize + 56.0;
@@ -266,11 +282,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           if (previewCats.length >= 8) break;
                         }
                         if (previewCats.isEmpty) return const SizedBox.shrink();
-                        final effectiveBridgeUrl = Provider.of<SubsonicService>(
-                                  context,
-                                  listen: false,
-                                ).config?.bridgeUrl ??
-                            '';
+                        final effectiveBridgeUrl = _resolveBridgeUrl();
 
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,

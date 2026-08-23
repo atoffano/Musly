@@ -18,6 +18,8 @@ import 'animated_equalizer.dart';
 import 'multi_artist_widget.dart';
 import '../screens/album_screen.dart';
 import '../screens/artist_screen.dart';
+import '../screens/bridge_artist_screen.dart';
+
 
 class SongTile extends StatelessWidget {
   final Song song;
@@ -927,15 +929,20 @@ class _SongOptionsSheetState extends State<_SongOptionsSheet> {
 
   void _navigateToArtist(NavigatorState nav) {
     final participants = widget.song.artistParticipants;
+    final effective = (participants != null && participants.isNotEmpty)
+        ? participants
+        : (widget.song.artist != null
+            ? ArtistRef.splitArtistString(widget.song.artist!, widget.song.artistId)
+            : const <ArtistRef>[]);
 
-    if (participants != null && participants.length > 1) {
+    if (effective.length > 1) {
       final ctx = NavigationHelper.navigatorKey.currentContext;
       if (ctx == null) return;
       showModalBottomSheet(
         context: ctx,
         backgroundColor: Colors.transparent,
         builder: (sheetCtx) => ArtistsBottomSheet(
-          artists: participants,
+          artists: effective,
           onArtistTap: (artist) {
             Navigator.pop(sheetCtx);
             _pushArtist(nav, artist);
@@ -945,7 +952,7 @@ class _SongOptionsSheetState extends State<_SongOptionsSheet> {
       return;
     }
 
-    final single = participants?.firstOrNull;
+    final single = effective.firstOrNull;
     if (single != null) {
       _pushArtist(nav, single);
       return;
@@ -960,9 +967,36 @@ class _SongOptionsSheetState extends State<_SongOptionsSheet> {
   }
 
   void _pushArtist(NavigatorState nav, ArtistRef artist) {
-    if (artist.id.isNotEmpty) {
+    final ctx = NavigationHelper.navigatorKey.currentContext;
+    if (artist.id.startsWith('yt:')) {
+      final browseId = artist.id.substring(3);
+      nav.push(MaterialPageRoute(
+        builder: (_) => BridgeArtistScreen(
+          artistName: artist.name,
+          browseId: browseId.isNotEmpty ? browseId : null,
+          heroCoverArt: artist.coverArt,
+        ),
+      ));
+    } else if (artist.id.isNotEmpty) {
       nav.push(MaterialPageRoute(
         builder: (_) => ArtistScreen(artistId: artist.id),
+      ));
+    } else if (artist.name.isNotEmpty) {
+      if (ctx != null) {
+        final library = Provider.of<LibraryProvider>(ctx, listen: false);
+        final normalized = artist.name.toLowerCase().trim();
+        final local = library.artists
+            .where((a) => a.name.toLowerCase().trim() == normalized)
+            .firstOrNull;
+        if (local != null) {
+          nav.push(MaterialPageRoute(
+            builder: (_) => ArtistScreen(artistId: local.id),
+          ));
+          return;
+        }
+      }
+      nav.push(MaterialPageRoute(
+        builder: (_) => BridgeArtistScreen(artistName: artist.name),
       ));
     }
   }

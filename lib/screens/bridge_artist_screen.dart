@@ -70,10 +70,11 @@ class _BridgeArtistScreenState extends State<BridgeArtistScreen> {
           bridgeUrl,
           widget.artistName,
         );
-        _topSongs = search.songs
+        final filtered = search.songs
             .where((song) =>
                 (song.artist ?? '').toLowerCase().contains(widget.artistName.toLowerCase()))
             .toList();
+        _topSongs = filtered.isNotEmpty ? filtered : search.songs;
       }
 
       if (_heroCoverArt == null || _heroCoverArt!.isEmpty) {
@@ -94,6 +95,8 @@ class _BridgeArtistScreenState extends State<BridgeArtistScreen> {
   }
 
   String? _bridgeBaseUrl(LibraryProvider library) {
+    final direct = library.subsonicService.config?.bridgeUrl;
+    if (direct != null && direct.isNotEmpty) return direct;
     final config = library.subsonicService.config;
     if (config == null || config.serverUrl.isEmpty) {
       return null;

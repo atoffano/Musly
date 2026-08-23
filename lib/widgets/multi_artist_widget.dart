@@ -57,17 +57,38 @@ class MultiArtistWidget extends StatelessWidget {
     return Platform.isWindows || Platform.isLinux || Platform.isMacOS;
   }
 
-  List<ArtistRef> _effectiveArtists() {
-    if (artists != null && artists!.isNotEmpty) return artists!;
+  List<ArtistRef> _effectiveArtists(BuildContext context) {
+    if (artists != null && artists!.isNotEmpty) {
+      if (artists!.length > 1) {
+        return artists!;
+      }
+      final first = artists!.first;
+      final libraryProvider = Provider.of<LibraryProvider>(context, listen: false);
+      if (_findLocalArtistByName(libraryProvider, first.name) == null) {
+        final split = ArtistRef.splitArtistString(first.name, first.id);
+        if (split.length > 1) return split;
+      }
+      return artists!;
+    }
     final name = artistFallback;
     final id = artistIdFallback;
-    if (name != null || id != null) {
-      return [ArtistRef(id: id ?? '', name: name ?? '')];
+    if (name != null && name.trim().isNotEmpty) {
+      final libraryProvider = Provider.of<LibraryProvider>(context, listen: false);
+      if (_findLocalArtistByName(libraryProvider, name) == null) {
+        final split = ArtistRef.splitArtistString(name, id);
+        if (split.length > 1) return split;
+      }
+      return [ArtistRef(id: id ?? '', name: name.trim())];
     }
-    return [];
+    if (id != null && id.isNotEmpty) {
+      return [ArtistRef(id: id, name: '')];
+    }
+    return const [];
   }
 
   void _navigate(BuildContext context, ArtistRef artist) {
+    if (artist.name.isEmpty && artist.id.isEmpty) return;
+
     final libraryProvider = Provider.of<LibraryProvider>(context, listen: false);
     final localArtist = _findLocalArtistByName(libraryProvider, artist.name);
 
@@ -87,7 +108,7 @@ class MultiArtistWidget extends StatelessWidget {
       navigator.push(MaterialPageRoute(
         builder: (_) => BridgeArtistScreen(
           artistName: artist.name,
-          browseId: browseId,
+          browseId: browseId.isNotEmpty ? browseId : null,
           heroCoverArt: artist.coverArt,
         ),
       ));
@@ -176,11 +197,11 @@ class MultiArtistWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveArtists = _effectiveArtists();
+    final effectiveArtists = _effectiveArtists(context);
 
     if (effectiveArtists.isEmpty) {
       return Text(
-        AppLocalizations.of(context)!.unknownArtist,
+        AppLocalizations.of(context)?.unknownArtist ?? 'Unknown Artist',
         style: style,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
@@ -193,6 +214,7 @@ class MultiArtistWidget extends StatelessWidget {
       return MouseRegion(
         cursor: clickable ? SystemMouseCursors.click : MouseCursor.defer,
         child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: clickable ? () => _navigate(context, artist) : null,
           child: Text(
             artist.name,
@@ -204,43 +226,38 @@ class MultiArtistWidget extends StatelessWidget {
       );
     }
 
-    // Multiple artists
-    if (_isDesktop) {
-      return Wrap(
-        children: [
-          for (int i = 0; i < effectiveArtists.length; i++) ...[
-            MouseRegion(
-              cursor: SystemMouseCursors.click,
-              child: GestureDetector(
-                onTap: () => _navigate(context, effectiveArtists[i]),
-                child: Text(
-                  effectiveArtists[i].name,
-                  style: style?.copyWith(
-                    decoration: TextDecoration.underline,
-                    decorationColor: (style?.color ?? Colors.white)
-                        .withValues(alpha: 0.45),
+    // Multiple artists: each artist is an individually clickable link
+    return MouseRegion(
+      child: GestureDetector(
+        onLongPress: () => _showArtistsSheet(context, effectiveArtists),
+        child: Wrap(
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            for (int i = 0; i < effectiveArtists.length; i++) ...[
+              MouseRegion(
+                cursor: SystemMouseCursors.click,
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _navigate(context, effectiveArtists[i]),
+                  child: Text(
+                    effectiveArtists[i].name,
+                    style: style?.copyWith(
+                      decoration: _isDesktop ? TextDecoration.underline : null,
+                      decorationColor: (style?.color ?? Colors.white)
+                          .withValues(alpha: 0.45),
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
                 ),
               ),
-            ),
-            if (i < effectiveArtists.length - 1) Text(', ', style: style),
+              if (i < effectiveArtists.length - 1)
+                Text(
+                  ', ',
+                  style: style,
+                ),
+            ],
           ],
-        ],
-      );
-    }
-
-    // Mobile: whole line opens bottom sheet
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: () => _showArtistsSheet(context, effectiveArtists),
-        child: Text(
-          effectiveArtists.map((a) => a.name).join(', '),
-          style: style,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
         ),
       ),
     );

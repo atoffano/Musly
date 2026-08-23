@@ -1,7 +1,26 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 
 import '../models/song.dart';
 import 'subsonic_service.dart';
+
+Map<String, dynamic> _toMap(dynamic data) {
+  if (data == null) return {};
+  if (data is Map<String, dynamic>) return data;
+  if (data is Map) {
+    return data.map((key, value) => MapEntry(key.toString(), value));
+  }
+  if (data is String) {
+    try {
+      final decoded = json.decode(data);
+      if (decoded is Map<String, dynamic>) return decoded;
+      if (decoded is Map) {
+        return decoded.map((key, value) => MapEntry(key.toString(), value));
+      }
+    } catch (_) {}
+  }
+  return {};
+}
 
 class SaveJobSnapshot {
   final String jobId;
@@ -18,7 +37,7 @@ class SaveJobSnapshot {
     this.errorMessage,
   });
 
-  factory SaveJobSnapshot.fromJson(Map<String, dynamic> json) {
+  factory SaveJobSnapshot.fromJson(Map<dynamic, dynamic> json) {
     return SaveJobSnapshot(
       jobId: json['jobId']?.toString() ?? '',
       videoId: json['videoId']?.toString() ?? '',
@@ -40,11 +59,11 @@ class SaveResult {
     required this.deduplicated,
   });
 
-  factory SaveResult.fromJson(Map<String, dynamic> json) {
+  factory SaveResult.fromJson(Map<dynamic, dynamic> json) {
     return SaveResult(
       jobId: json['jobId']?.toString() ?? '',
       status: json['status']?.toString() ?? 'failed',
-      deduplicated: json['deduplicated'] as bool? ?? false,
+      deduplicated: json['deduplicated'] == true,
     );
   }
 }
@@ -62,11 +81,12 @@ class MuslyBackendService {
       '$baseUrl/api/search',
       queryParameters: {'query': query},
     );
-    final payload = response.data as Map<String, dynamic>;
+    final payload = _toMap(response.data);
     final songsJson = (payload['songs'] as List?) ?? const [];
 
     final songs = songsJson
-        .map((raw) => Song.fromJson(raw as Map<String, dynamic>))
+        .whereType<Map>()
+        .map((raw) => Song.fromJson(_toMap(raw)))
         .toList();
 
     return SearchResult(artists: const [], albums: const [], songs: songs);
@@ -77,10 +97,11 @@ class MuslyBackendService {
       '$baseUrl/api/artist/top-songs',
       data: {'browseId': browseId},
     );
-    final payload = response.data as Map<String, dynamic>;
+    final payload = _toMap(response.data);
     final songsJson = (payload['songs'] as List?) ?? const [];
     final songs = songsJson
-        .map((raw) => Song.fromJson(raw as Map<String, dynamic>))
+        .whereType<Map>()
+        .map((raw) => Song.fromJson(_toMap(raw)))
         .toList();
     return SearchResult(artists: const [], albums: const [], songs: songs);
   }
@@ -90,10 +111,11 @@ class MuslyBackendService {
       '$baseUrl/api/artist/full-discography',
       data: {'browseId': browseId},
     );
-    final payload = response.data as Map<String, dynamic>;
+    final payload = _toMap(response.data);
     final songsJson = (payload['songs'] as List?) ?? const [];
     final songs = songsJson
-        .map((raw) => Song.fromJson(raw as Map<String, dynamic>))
+        .whereType<Map>()
+        .map((raw) => Song.fromJson(_toMap(raw)))
         .toList();
     return SearchResult(artists: const [], albums: const [], songs: songs);
   }
@@ -103,7 +125,8 @@ class MuslyBackendService {
       '$baseUrl/api/stream',
       data: {'videoId': videoId},
     );
-    final rawUrl = (response.data as Map<String, dynamic>)['streamUrl'] as String;
+    final payload = _toMap(response.data);
+    final rawUrl = payload['streamUrl']?.toString() ?? '';
     if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
       return rawUrl;
     }
@@ -128,13 +151,13 @@ class MuslyBackendService {
         if (album != null) 'album': album,
       },
     );
-    return SaveResult.fromJson(response.data as Map<String, dynamic>);
+    return SaveResult.fromJson(_toMap(response.data));
   }
 
   Future<SaveJobSnapshot> getJobStatus(String baseUrl, String jobId) async {
     final response = await _dio.get('$baseUrl/api/job/$jobId');
-    final payload = response.data as Map<String, dynamic>;
-    final job = payload['job'] as Map<String, dynamic>;
+    final payload = _toMap(response.data);
+    final job = _toMap(payload['job']);
     return SaveJobSnapshot.fromJson(job);
   }
 
@@ -150,16 +173,17 @@ class MuslyBackendService {
         if (songId != null && songId.isNotEmpty) 'songId': songId,
       },
     );
-    final payload = response.data as Map<String, dynamic>;
+    final payload = _toMap(response.data);
     return payload['status']?.toString() == 'removed';
   }
 
   Future<List<MoodSection>> getMoodCategories(String baseUrl) async {
     final response = await _dio.get('$baseUrl/api/moods');
-    final payload = response.data as Map<String, dynamic>;
+    final payload = _toMap(response.data);
     final sectionsJson = (payload['sections'] as List?) ?? const [];
     return sectionsJson
-        .map((raw) => MoodSection.fromJson(raw as Map<String, dynamic>))
+        .whereType<Map>()
+        .map((raw) => MoodSection.fromJson(_toMap(raw)))
         .toList();
   }
 
@@ -170,19 +194,21 @@ class MuslyBackendService {
     final response = await _dio.get(
       '$baseUrl/api/moods/$params',
     );
-    final payload = response.data as Map<String, dynamic>;
+    final payload = _toMap(response.data);
     final playlistsJson = (payload['playlists'] as List?) ?? const [];
     return playlistsJson
-        .map((raw) => MoodPlaylist.fromJson(raw as Map<String, dynamic>))
+        .whereType<Map>()
+        .map((raw) => MoodPlaylist.fromJson(_toMap(raw)))
         .toList();
   }
 
   Future<List<MoodPlaylist>> getFeaturedPlaylists(String baseUrl) async {
     final response = await _dio.get('$baseUrl/api/featured-playlists');
-    final payload = response.data as Map<String, dynamic>;
+    final payload = _toMap(response.data);
     final playlistsJson = (payload['playlists'] as List?) ?? const [];
     return playlistsJson
-        .map((raw) => MoodPlaylist.fromJson(raw as Map<String, dynamic>))
+        .whereType<Map>()
+        .map((raw) => MoodPlaylist.fromJson(_toMap(raw)))
         .toList();
   }
 
@@ -195,10 +221,11 @@ class MuslyBackendService {
       '$baseUrl/api/playlist-songs',
       data: {'playlistId': playlistId, 'limit': limit},
     );
-    final payload = response.data as Map<String, dynamic>;
+    final payload = _toMap(response.data);
     final songsJson = (payload['songs'] as List?) ?? const [];
     return songsJson
-        .map((raw) => Song.fromJson(raw as Map<String, dynamic>))
+        .whereType<Map>()
+        .map((raw) => Song.fromJson(_toMap(raw)))
         .toList();
   }
 }
@@ -209,12 +236,13 @@ class MoodSection {
 
   MoodSection({required this.name, required this.categories});
 
-  factory MoodSection.fromJson(Map<String, dynamic> json) {
+  factory MoodSection.fromJson(Map<dynamic, dynamic> json) {
     final cats = (json['categories'] as List?) ?? const [];
     return MoodSection(
-      name: json['name'] as String? ?? '',
+      name: json['name']?.toString() ?? '',
       categories: cats
-          .map((c) => MoodCategory.fromJson(c as Map<String, dynamic>))
+          .whereType<Map>()
+          .map((c) => MoodCategory.fromJson(c))
           .toList(),
     );
   }
@@ -226,10 +254,10 @@ class MoodCategory {
 
   MoodCategory({required this.params, required this.title});
 
-  factory MoodCategory.fromJson(Map<String, dynamic> json) {
+  factory MoodCategory.fromJson(Map<dynamic, dynamic> json) {
     return MoodCategory(
-      params: json['params'] as String? ?? '',
-      title: json['title'] as String? ?? '',
+      params: json['params']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
     );
   }
 }
@@ -247,19 +275,22 @@ class MoodPlaylist {
     this.thumbnailUrl,
   });
 
-  factory MoodPlaylist.fromJson(Map<String, dynamic> json) {
+  factory MoodPlaylist.fromJson(Map<dynamic, dynamic> json) {
     String? thumb;
     final thumbs = json['thumbnails'] as List?;
     if (thumbs != null && thumbs.isNotEmpty) {
-      final last = thumbs.last as Map<String, dynamic>?;
-      thumb = last?['url'] as String?;
+      final last = thumbs.last;
+      if (last is Map) {
+        thumb = last['url']?.toString();
+      }
     }
     return MoodPlaylist(
-      playlistId: json['playlistId'] as String? ?? '',
-      title: json['title'] as String? ?? '',
-      description: json['description'] as String?,
-      thumbnailUrl: thumb ?? json['thumbnailUrl'] as String?,
+      playlistId: json['playlistId']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      description: json['description']?.toString(),
+      thumbnailUrl: thumb ?? json['thumbnailUrl']?.toString(),
     );
   }
 }
+
 

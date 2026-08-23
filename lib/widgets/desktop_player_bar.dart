@@ -8,6 +8,8 @@ import '../theme/app_theme.dart';
 import '../screens/artist_screen.dart';
 import '../widgets/synced_lyrics_view.dart';
 import 'album_artwork.dart';
+import 'multi_artist_widget.dart';
+
 
 class DesktopPlayerBar extends StatefulWidget {
   final GlobalKey<NavigatorState>? navigatorKey;
@@ -257,26 +259,16 @@ class _DesktopPlayerBarState extends State<DesktopPlayerBar> {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 4),
-                      if (currentSong.artist != null)
-                        MouseRegion(
-                          cursor: SystemMouseCursors.click,
-                          child: GestureDetector(
-                            onTap: () {
-                              if (currentSong.artistId != null) {
-                                _navigateToArtist(context, currentSong.artistId!);
-                              }
-                            },
-                            child: Text(
-                              currentSong.artist!,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: isDark ? Colors.grey[400] : Colors.grey[600],
-                                fontSize: 12,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
+                      MultiArtistWidget(
+                        artists: currentSong.artistParticipants,
+                        artistFallback: currentSong.artist,
+                        artistIdFallback: currentSong.artistId,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          fontSize: 12,
                         ),
+                      ),
+
                     ],
                   ),
                 ),
