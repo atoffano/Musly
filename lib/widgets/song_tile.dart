@@ -144,47 +144,45 @@ class SongTile extends StatelessWidget {
   }
 
   Widget _buildSubtitleWidget(ThemeData theme) {
-    if (showArtist) {
-      if (showAlbum && song.album != null) {
-        return Row(
-          children: [
-            Flexible(
-              flex: 3,
-              fit: FlexFit.loose,
-              child: MultiArtistWidget(
-                artists: song.artistParticipants,
-                artistFallback: song.artist,
-                artistIdFallback: song.artistId,
-                style: theme.textTheme.bodySmall,
-              ),
-            ),
-            Flexible(
-              flex: 1,
-              fit: FlexFit.loose,
-              child: Text(
-                ' \u2022 ${song.album}',
-                style: theme.textTheme.bodySmall,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
+    final artist = song.artist ?? '';
+    final album = song.album ?? '';
+
+    if (showArtist && showAlbum && album.isNotEmpty) {
+      if (artist.isNotEmpty) {
+        return Text(
+          '$artist \u2022 $album',
+          style: theme.textTheme.bodySmall,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         );
       }
-      return MultiArtistWidget(
-        artists: song.artistParticipants,
-        artistFallback: song.artist,
-        artistIdFallback: song.artistId,
+      return Text(
+        album,
         style: theme.textTheme.bodySmall,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       );
     }
 
-    return Text(
-      song.album ?? '',
-      style: theme.textTheme.bodySmall,
-      maxLines: 1,
-      overflow: TextOverflow.ellipsis,
-    );
+    if (showArtist && artist.isNotEmpty) {
+      return Text(
+        artist,
+        style: theme.textTheme.bodySmall,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    if (showAlbum && album.isNotEmpty) {
+      return Text(
+        album,
+        style: theme.textTheme.bodySmall,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 
   Widget _buildTrailing(BuildContext context) {
