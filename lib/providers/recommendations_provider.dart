@@ -10,6 +10,12 @@ class RecommendationsProvider extends ChangeNotifier {
   String? _error;
   bool _initialized = false;
 
+  // Featured playlists on home page
+  List<MoodPlaylist> _featuredPlaylists = [];
+  bool _loadingFeatured = false;
+  String? _featuredError;
+  bool _featuredInitialized = false;
+
   // Mood playlists state (when drilling into a category)
   List<MoodPlaylist> _moodPlaylists = [];
   bool _loadingPlaylists = false;
@@ -26,6 +32,12 @@ class RecommendationsProvider extends ChangeNotifier {
   bool get initialized => _initialized;
   bool get hasData => _sections.isNotEmpty;
 
+  List<MoodPlaylist> get featuredPlaylists => _featuredPlaylists;
+  bool get loadingFeatured => _loadingFeatured;
+  String? get featuredError => _featuredError;
+  bool get featuredInitialized => _featuredInitialized;
+  bool get hasFeaturedData => _featuredPlaylists.isNotEmpty;
+
   List<MoodPlaylist> get moodPlaylists => _moodPlaylists;
   bool get loadingPlaylists => _loadingPlaylists;
   String? get playlistsError => _playlistsError;
@@ -33,6 +45,25 @@ class RecommendationsProvider extends ChangeNotifier {
   List<Song> get playlistSongs => _playlistSongs;
   bool get loadingSongs => _loadingSongs;
   String? get songsError => _songsError;
+
+  Future<void> loadFeaturedPlaylists(String baseUrl) async {
+    if (_loadingFeatured) return;
+
+    _loadingFeatured = true;
+    _featuredError = null;
+    notifyListeners();
+
+    try {
+      _featuredPlaylists = await _backendService.getFeaturedPlaylists(baseUrl);
+      _featuredInitialized = true;
+    } catch (e) {
+      _featuredError = e.toString();
+      debugPrint('Failed to load featured playlists: $e');
+    } finally {
+      _loadingFeatured = false;
+      notifyListeners();
+    }
+  }
 
   Future<void> loadMoodCategories(String baseUrl) async {
     if (_loading) return;

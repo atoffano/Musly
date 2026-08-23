@@ -178,6 +178,20 @@ abstract class AppLocalizations {
   /// **'Quick Picks'**
   String get quickPicks;
 
+  /// Musly Picks section title
+  ///
+  /// In en, this message translates to:
+  /// **'Musly Picks'**
+  String get muslyPicks => 'Musly Picks';
+
+  /// Featured Playlists section title
+  ///
+  /// In en, this message translates to:
+  /// **'Featured Playlists'**
+  String get featuredPlaylists => 'Featured Playlists';
+
+
+
   /// Discover Mix section title
   ///
   /// In en, this message translates to:

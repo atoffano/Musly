@@ -32,6 +32,16 @@
     "description": "Quick Picks section title"
   },
 
+  "muslyPicks": "Musly Picks",
+  "@muslyPicks": {
+    "description": "Musly Picks section title"
+  },
+
+  "featuredPlaylists": "Featured Playlists",
+  "@featuredPlaylists": {
+    "description": "Featured Playlists section title"
+  },
+
   "discoverMix": "Discover Mix",
   "@discoverMix": {
     "description": "Discover Mix section title"

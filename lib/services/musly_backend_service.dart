@@ -177,6 +177,15 @@ class MuslyBackendService {
         .toList();
   }
 
+  Future<List<MoodPlaylist>> getFeaturedPlaylists(String baseUrl) async {
+    final response = await _dio.get('$baseUrl/api/featured-playlists');
+    final payload = response.data as Map<String, dynamic>;
+    final playlistsJson = (payload['playlists'] as List?) ?? const [];
+    return playlistsJson
+        .map((raw) => MoodPlaylist.fromJson(raw as Map<String, dynamic>))
+        .toList();
+  }
+
   Future<List<Song>> getPlaylistSongs(
     String baseUrl,
     String playlistId, {

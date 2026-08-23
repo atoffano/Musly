@@ -64,6 +64,9 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!recProvider.initialized) {
           await recProvider.loadMoodCategories(bridgeUrl);
         }
+        if (!recProvider.featuredInitialized) {
+          await recProvider.loadFeaturedPlaylists(bridgeUrl);
+        }
       }
     } catch (e) {
       // Silently fail — recommendations are optional
@@ -156,6 +159,97 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     const SizedBox(height: 24),
 
+                    // YT Music Featured Playlists section
+                    Consumer<RecommendationsProvider>(
+                      builder: (context, recProvider, _) {
+                        if (recProvider.loadingFeatured && !recProvider.hasFeaturedData) {
+                          return Padding(
+                            padding: EdgeInsets.symmetric(horizontal: hPad),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _SectionTitle(
+                                  title: AppLocalizations.of(context)?.featuredPlaylists ?? 'Featured Playlists',
+                                  iconWidget: const YouTubeMusicLogo(size: 20),
+                                  hPad: 0,
+                                ),
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  height: (isDesktop ? 160.0 : 130.0) + 56.0,
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    itemCount: 6,
+                                    itemBuilder: (_, __) => Padding(
+                                      padding: const EdgeInsets.symmetric(horizontal: 5),
+                                      child: Container(
+                                        width: isDesktop ? 160.0 : 130.0,
+                                        height: isDesktop ? 160.0 : 130.0,
+                                        decoration: BoxDecoration(
+                                          color: isDark ? const Color(0xFF282828) : Colors.grey[200],
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                              ],
+                            ),
+                          );
+                        }
+
+                        if (!recProvider.hasFeaturedData) {
+                          return const SizedBox.shrink();
+                        }
+
+                        final effectiveBridgeUrl = Provider.of<SubsonicService>(
+                                  context,
+                                  listen: false,
+                                ).config?.bridgeUrl ??
+                            '';
+
+                        final cardSize = isDesktop ? 160.0 : 130.0;
+                        final totalHeight = cardSize + 56.0;
+
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _SectionTitle(
+                              title: AppLocalizations.of(context)?.featuredPlaylists ?? 'Featured Playlists',
+                              iconWidget: const YouTubeMusicLogo(size: 20),
+                              hPad: hPad,
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: totalHeight,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                padding: EdgeInsets.symmetric(horizontal: hPad - 5),
+                                itemCount: recProvider.featuredPlaylists.length,
+                                itemBuilder: (context, index) {
+                                  final playlist = recProvider.featuredPlaylists[index];
+                                  return _FeaturedPlaylistSquareCard(
+                                    playlist: playlist,
+                                    size: cardSize,
+                                    onTap: () => NavigationHelper.push(
+                                      context,
+                                      PlaylistSongsScreen(
+                                        playlistTitle: playlist.title,
+                                        playlistId: playlist.playlistId,
+                                        bridgeUrl: effectiveBridgeUrl,
+                                        thumbnailUrl: playlist.thumbnailUrl,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                            const SizedBox(height: 24),
+                          ],
+                        );
+                      },
+                    ),
+
                     // YT Music Moods & Genres recommendations section
                     Consumer<RecommendationsProvider>(
                       builder: (context, recProvider, _) {
@@ -187,7 +281,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               child: _SectionTitle(
                                 title: AppLocalizations.of(context)!.recommendations,
-                                icon: Icons.auto_awesome_rounded,
+                                iconWidget: const YouTubeMusicLogo(size: 20),
                                 hPad: hPad,
                               ),
                             ),
@@ -268,12 +362,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 24),
                     ],
 
-                    if (mixes.containsKey('Quick Picks')) ...[
-                      _SectionTitle(title: AppLocalizations.of(context)!.quickPicks, icon: Icons.bolt_rounded, hPad: hPad),
+                    if (mixes.containsKey('Musly Picks')) ...[
+                      _SectionTitle(title: AppLocalizations.of(context)?.muslyPicks ?? 'Musly Picks', icon: Icons.bolt_rounded, hPad: hPad),
                       if (isDesktop) _DesktopSongTableHeader(hPad: hPad),
-                      ...mixes['Quick Picks']!.take(5).map((song) {
-                        if (isDesktop) return _DesktopSongRow(song: song, playlist: mixes['Quick Picks']!, index: mixes['Quick Picks']!.indexOf(song), hPad: hPad);
-                        return SongTile(song: song, playlist: mixes['Quick Picks']!, index: mixes['Quick Picks']!.indexOf(song), showAlbum: true);
+                      ...mixes['Musly Picks']!.take(5).map((song) {
+                        if (isDesktop) return _DesktopSongRow(song: song, playlist: mixes['Musly Picks']!, index: mixes['Musly Picks']!.indexOf(song), hPad: hPad);
+                        return SongTile(song: song, playlist: mixes['Musly Picks']!, index: mixes['Musly Picks']!.indexOf(song), showAlbum: true);
                       }),
                       const SizedBox(height: 24),
                     ],
@@ -290,6 +384,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     for (final entry in mixes.entries.where(
                       (e) =>
+                          e.key != 'Musly Picks' &&
                           e.key != 'Quick Picks' &&
                           e.key != 'Discover Mix' &&
                           !e.key.contains('Vibes'),
@@ -302,6 +397,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       }),
                       const SizedBox(height: 24),
                     ],
+
 
                     for (final entry in mixes.entries.where(
                       (e) => e.key.contains('Vibes'),
@@ -779,9 +875,15 @@ class _PlaylistCard extends StatelessWidget {
 class _SectionTitle extends StatelessWidget {
   final String title;
   final IconData? icon;
+  final Widget? iconWidget;
   final double hPad;
 
-  const _SectionTitle({required this.title, this.icon, this.hPad = 16});
+  const _SectionTitle({
+    required this.title,
+    this.icon,
+    this.iconWidget,
+    this.hPad = 16,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -790,7 +892,10 @@ class _SectionTitle extends StatelessWidget {
       padding: EdgeInsets.fromLTRB(hPad, 4, hPad, 4),
       child: Row(
         children: [
-          if (icon != null) ...[
+          if (iconWidget != null) ...[
+            iconWidget!,
+            const SizedBox(width: 8),
+          ] else if (icon != null) ...[
             Icon(icon, size: 20, color: AppTheme.appleMusicRed),
             const SizedBox(width: 8),
           ],
@@ -808,6 +913,116 @@ class _SectionTitle extends StatelessWidget {
     );
   }
 }
+
+class _FeaturedPlaylistSquareCard extends StatelessWidget {
+  final MoodPlaylist playlist;
+  final VoidCallback onTap;
+  final double size;
+
+  const _FeaturedPlaylistSquareCard({
+    required this.playlist,
+    required this.onTap,
+    this.size = 140,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      child: SizedBox(
+        width: size,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: playlist.thumbnailUrl != null &&
+                          playlist.thumbnailUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: playlist.thumbnailUrl!,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(
+                            color: isDark
+                                ? const Color(0xFF282828)
+                                : Colors.grey[300],
+                          ),
+                          errorWidget: (_, __, ___) => Container(
+                            color: isDark
+                                ? const Color(0xFF282828)
+                                : Colors.grey[300],
+                            child: const Center(
+                              child: Icon(
+                                Icons.music_note_rounded,
+                                size: 40,
+                                color: Colors.white30,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Container(
+                          color: isDark
+                              ? const Color(0xFF282828)
+                              : Colors.grey[300],
+                          child: const Center(
+                            child: Icon(
+                              Icons.playlist_play_rounded,
+                              size: 40,
+                              color: Colors.white30,
+                            ),
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                playlist.title,
+                style: TextStyle(
+                  color: isDark ? Colors.white : Colors.black,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (playlist.description != null &&
+                  playlist.description!.isNotEmpty) ...[
+                const SizedBox(height: 2),
+                Text(
+                  playlist.description!,
+                  style: TextStyle(
+                    color: isDark ? Colors.white54 : Colors.black54,
+                    fontSize: 11,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 
 class _DesktopSongTableHeader extends StatelessWidget {
   final double hPad;

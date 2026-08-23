@@ -27,6 +27,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quickPicks => 'Quick Picks';
 
   @override
+  String get muslyPicks => 'Musly Picks';
+
+  @override
+  String get featuredPlaylists => 'Featured Playlists';
+
+
+  @override
   String get discoverMix => 'Discover Mix';
 
   @override

@@ -10,3 +10,4 @@ export 'shimmer_loading.dart';
 export 'desktop_player_bar.dart';
 export 'desktop_navigation_sidebar.dart';
 export 'star_rating_widget.dart';
+export 'youtube_music_logo.dart';

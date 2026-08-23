@@ -284,7 +284,7 @@ class RecommendationService extends ChangeNotifier {
     final mixes = <String, List<Song>>{};
 
     final quick = getQuickPicks(allSongs, limit: 20);
-    if (quick.isNotEmpty) mixes['Quick Picks'] = quick;
+    if (quick.isNotEmpty) mixes['Musly Picks'] = quick;
 
     final discover = getDiscoverMix(allSongs, limit: 20);
     if (discover.isNotEmpty) mixes['Discover Mix'] = discover;
