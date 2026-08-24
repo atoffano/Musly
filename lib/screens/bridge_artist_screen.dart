@@ -42,7 +42,7 @@ class _BridgeArtistScreenState extends State<BridgeArtistScreen> {
 
   Future<void> _loadArtistData() async {
     final library = context.read<LibraryProvider>();
-    final bridgeUrl = _bridgeBaseUrl(library);
+    final bridgeUrl = library.subsonicService.bridgeUrl;
 
     if (bridgeUrl == null) {
       setState(() {
@@ -94,19 +94,6 @@ class _BridgeArtistScreenState extends State<BridgeArtistScreen> {
     }
   }
 
-  String? _bridgeBaseUrl(LibraryProvider library) {
-    final direct = library.subsonicService.config?.bridgeUrl;
-    if (direct != null && direct.isNotEmpty) return direct;
-    final config = library.subsonicService.config;
-    if (config == null || config.serverUrl.isEmpty) {
-      return null;
-    }
-    final uri = Uri.tryParse(config.serverUrl);
-    if (uri == null || uri.host.isEmpty) {
-      return null;
-    }
-    return '${uri.scheme}://${uri.host}:8788';
-  }
 
   @override
   Widget build(BuildContext context) {

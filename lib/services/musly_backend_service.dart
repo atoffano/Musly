@@ -70,11 +70,20 @@ class SaveResult {
 
 class MuslyBackendService {
   final Dio _dio;
+  static MuslyBackendService? _instance;
 
-  MuslyBackendService({Dio? dio}) : _dio = dio ?? Dio() {
+  factory MuslyBackendService({Dio? dio}) {
+    if (dio != null) {
+      return MuslyBackendService._internal(dio);
+    }
+    return _instance ??= MuslyBackendService._internal(Dio());
+  }
+
+  MuslyBackendService._internal(Dio dio) : _dio = dio {
     _dio.options.connectTimeout = const Duration(seconds: 30);
     _dio.options.receiveTimeout = const Duration(seconds: 30);
   }
+
 
   Future<SearchResult> searchSongs(String baseUrl, String query) async {
     final response = await _dio.get(

@@ -785,21 +785,8 @@ class LibraryProvider extends ChangeNotifier {
     }
   }
 
-  String? _bridgeBaseUrl() {
-    final config = _subsonicService.config;
-    if (config == null) return null;
-    if (config.bridgeUrl != null && config.bridgeUrl!.trim().isNotEmpty) {
-      return config.bridgeUrl!.trim();
-    }
-    if (config.serverUrl.isEmpty) {
-      return null;
-    }
-    final uri = Uri.tryParse(config.serverUrl);
-    if (uri == null || uri.host.isEmpty) {
-      return null;
-    }
-    return '${uri.scheme}://${uri.host}:8788';
-  }
+  String? _bridgeBaseUrl() => _subsonicService.bridgeUrl;
+
 
   SearchResult _searchLocal(String query) {
     final q = query.toLowerCase();

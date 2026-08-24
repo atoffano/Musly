@@ -159,7 +159,10 @@ class SubsonicService {
 
   ServerConfig? get config => _config;
 
+  String? get bridgeUrl => _config?.bridgeUrl;
+
   bool get isConfigured => _config != null && _config!.isValid;
+
 
   Map<String, String> _getAuthParams() {
     if (_config == null) throw Exception('Server not configured');

@@ -32,35 +32,11 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
   }
 
   String? _resolveBridgeUrl() {
-    if (_bridgeUrl != null && _bridgeUrl!.isNotEmpty) return _bridgeUrl;
-    try {
-      final config = Provider.of<SubsonicService>(context, listen: false).config;
-      return config?.bridgeUrl;
-    } catch (_) {
-      return null;
-    }
+    return Provider.of<SubsonicService>(context, listen: false).bridgeUrl;
   }
 
   Future<void> _loadCategories() async {
-    final directUrl = _resolveBridgeUrl();
-    if (directUrl != null && directUrl.isNotEmpty) {
-      if (mounted) setState(() => _bridgeUrl = directUrl);
-      final recProvider =
-          Provider.of<RecommendationsProvider>(context, listen: false);
-      if (!recProvider.initialized) {
-        await recProvider.loadMoodCategories(directUrl);
-      }
-      return;
-    }
-
-    final storageService = Provider.of<StorageService>(context, listen: false);
-    final settings = await storageService.getServerConfig();
-    final url = settings?.bridgeUrl;
-
-    if (mounted) {
-      setState(() => _bridgeUrl = url);
-    }
-
+    final url = _resolveBridgeUrl();
     if (url == null || url.isEmpty) return;
 
     final recProvider =
@@ -69,6 +45,7 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
       await recProvider.loadMoodCategories(url);
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -345,13 +322,9 @@ class _MoodPlaylistsScreenState extends State<MoodPlaylistsScreen> {
 
   String _getEffectiveBridgeUrl() {
     if (widget.bridgeUrl.isNotEmpty) return widget.bridgeUrl;
-    try {
-      final config = Provider.of<SubsonicService>(context, listen: false).config;
-      return config?.bridgeUrl ?? '';
-    } catch (_) {
-      return '';
-    }
+    return Provider.of<SubsonicService>(context, listen: false).bridgeUrl ?? '';
   }
+
 
   @override
   void initState() {
@@ -588,13 +561,9 @@ class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
 
   String _getEffectiveBridgeUrl() {
     if (widget.bridgeUrl.isNotEmpty) return widget.bridgeUrl;
-    try {
-      final config = Provider.of<SubsonicService>(context, listen: false).config;
-      return config?.bridgeUrl ?? '';
-    } catch (_) {
-      return '';
-    }
+    return Provider.of<SubsonicService>(context, listen: false).bridgeUrl ?? '';
   }
+
 
   @override
   void initState() {

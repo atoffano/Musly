@@ -56,32 +56,15 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   String _resolveBridgeUrl() {
-    final subsonic = Provider.of<SubsonicService>(context, listen: false);
-    final direct = subsonic.config?.bridgeUrl;
-    if (direct != null && direct.isNotEmpty) return direct;
-    final serverUrl = subsonic.config?.normalizedUrl ?? subsonic.config?.serverUrl;
-    if (serverUrl != null && serverUrl.isNotEmpty) {
-      try {
-        final uri = Uri.parse(serverUrl);
-        if (uri.host.isNotEmpty) {
-          return '${uri.scheme}://${uri.host}:8788';
-        }
-      } catch (_) {}
-    }
-    return '';
+    return Provider.of<SubsonicService>(context, listen: false).bridgeUrl ?? '';
   }
 
   Future<void> _loadRecommendations() async {
     try {
-      final directUrl = Provider.of<SubsonicService>(context, listen: false).config?.bridgeUrl;
-      final serverConfigUrl = (await Provider.of<StorageService>(context, listen: false).getServerConfig())?.bridgeUrl;
-      final fallbackUrl = _resolveBridgeUrl();
-      final bridgeUrl = (directUrl != null && directUrl.isNotEmpty)
-          ? directUrl
-          : ((serverConfigUrl != null && serverConfigUrl.isNotEmpty) ? serverConfigUrl : fallbackUrl);
-
+      final bridgeUrl = _resolveBridgeUrl();
       if (bridgeUrl.isNotEmpty) {
-        final recProvider = Provider.of<RecommendationsProvider>(context, listen: false);
+        final recProvider =
+            Provider.of<RecommendationsProvider>(context, listen: false);
         if (!recProvider.initialized) {
           recProvider.loadMoodCategories(bridgeUrl);
         }
@@ -93,6 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrint('Failed to load recommendations on home screen: $e');
     }
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -655,7 +639,8 @@ class _QuickAccessGrid extends StatelessWidget {
     dynamic item,
     SubsonicService subsonicService,
   ) {
-    final isPlaylist = item.runtimeType.toString().contains('Playlist');
+    final isPlaylist = item is Playlist;
+
     String? imageUrl;
     String title;
     VoidCallback onTap;

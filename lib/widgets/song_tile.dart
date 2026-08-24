@@ -49,9 +49,9 @@ class SongTile extends StatelessWidget {
 
   bool _canToggleLibrarySaved(Song song) {
     return song.isYouTube ||
-        (song.sourceId != null && song.sourceId!.isNotEmpty) ||
-        song.id.startsWith('yt:');
+        (song.sourceId != null && song.sourceId!.isNotEmpty);
   }
+
 
   @override
   Widget build(BuildContext context) {
