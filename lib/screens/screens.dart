@@ -15,3 +15,5 @@ export 'playlist_screen.dart';
 export 'recommendations_screen.dart';
 export 'settings_screen.dart';
 export 'fantasy_screen.dart';
+export 'pipeline_logs_screen.dart';
+

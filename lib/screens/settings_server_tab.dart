@@ -10,6 +10,8 @@ import '../services/subsonic_service.dart';
 import '../theme/app_theme.dart';
 import '../utils/navigation_helper.dart';
 import 'jukebox_screen.dart';
+import 'pipeline_logs_screen.dart';
+
 
 class SettingsServerTab extends StatefulWidget {
   const SettingsServerTab({super.key});
@@ -73,6 +75,11 @@ class _SettingsServerTabState extends State<SettingsServerTab> {
         _buildSection(
           title: l10n.sectionJukebox,
           children: [_buildJukeboxSection()],
+        ),
+        const SizedBox(height: 24),
+        _buildSection(
+          title: 'Logs',
+          children: [_buildLogsTile(authProvider.config?.bridgeUrl)],
         ),
         const SizedBox(height: 24),
         _buildSection(
@@ -158,6 +165,37 @@ class _SettingsServerTabState extends State<SettingsServerTab> {
         ),
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
+      ),
+    );
+  }
+
+  Widget _buildLogsTile(String? bridgeUrl) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      leading: Container(
+        width: 32,
+        height: 32,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFF9500).withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Icon(CupertinoIcons.doc_text_search, color: Color(0xFFFF9500), size: 18),
+      ),
+      title: const Text('Pipeline Logs', style: TextStyle(fontSize: 16)),
+      subtitle: Text(
+        'music-pipeline logs (last 10 minutes)',
+        style: TextStyle(
+          fontSize: 13,
+          color: _isDark ? AppTheme.darkSecondaryText : AppTheme.lightSecondaryText,
+        ),
+      ),
+      trailing: Icon(
+        CupertinoIcons.chevron_right,
+        size: 16,
+        color: _isDark ? AppTheme.darkSecondaryText : AppTheme.lightSecondaryText,
+      ),
+      onTap: () => Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => PipelineLogsScreen(bridgeUrl: bridgeUrl)),
       ),
     );
   }

@@ -237,6 +237,15 @@ class MuslyBackendService {
         .map((raw) => Song.fromJson(_toMap(raw)))
         .toList();
   }
+
+  Future<String> getLogs(String baseUrl, {int minutes = 10}) async {
+    final response = await _dio.get(
+      '$baseUrl/api/logs',
+      queryParameters: {'minutes': minutes},
+    );
+    final payload = _toMap(response.data);
+    return payload['logs']?.toString() ?? '';
+  }
 }
 
 class MoodSection {
