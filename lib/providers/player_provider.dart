@@ -1025,28 +1025,7 @@ class PlayerProvider extends ChangeNotifier {
           final threshold = (totalSec / 2).clamp(15, 240);
           if (currentSec >= threshold) {
             _hasScrobbledCurrentSong = true;
-            if (_currentSong!.isLocal != true && !_currentSong!.isYouTube) {
-              _subsonicService.scrobble(_currentSong!.id, submission: true).catchError((e) {
-                _offlineService.queueScrobble(_currentSong!.id, submission: true);
-              });
-            } else if (_currentSong!.isYouTube) {
-              final sourceId = _currentSong!.sourceId ??
-                  (_currentSong!.id.startsWith('yt:') ? _currentSong!.id.substring(3) : null);
-              final bridge = _bridgeBaseUrl();
-              if (sourceId != null && bridge != null) {
-                _muslyBackendService.scrobble(
-                  bridge,
-                  videoId: sourceId,
-                  title: _currentSong!.title,
-                  artist: _currentSong!.artist,
-                  album: _currentSong!.album,
-                  duration: _currentSong!.duration,
-                  submission: true,
-                ).catchError((e) {
-                  debugPrint('YouTube scrobble at 50% failed: $e');
-                });
-              }
-            }
+            _performScrobble(_currentSong!, submission: true);
           }
         }
       },
@@ -1067,34 +1046,47 @@ class PlayerProvider extends ChangeNotifier {
     );
   }
 
-  void _onSongComplete() {
-    
-    if (_currentSong != null && !_hasScrobbledCurrentSong) {
-      _hasScrobbledCurrentSong = true;
-      if (_currentSong!.isLocal != true && !_currentSong!.isYouTube) {
-        _subsonicService.scrobble(_currentSong!.id, submission: true).catchError((
-          e,
-        ) {
-          _offlineService.queueScrobble(_currentSong!.id, submission: true);
+  void _performScrobble(Song song, {required bool submission}) {
+    // 1. Subsonic (Navidrome) scrobble for library songs
+    if (song.isLocal != true && !song.isYouTube) {
+      if (_offlineService.isOfflineMode) {
+        _offlineService.queueScrobble(song.id, submission: submission);
+      } else {
+        _subsonicService.scrobble(song.id, submission: submission).catchError((e) {
+          _offlineService.queueScrobble(song.id, submission: submission);
         });
-      } else if (_currentSong!.isYouTube) {
-        final sourceId = _currentSong!.sourceId ??
-            (_currentSong!.id.startsWith('yt:') ? _currentSong!.id.substring(3) : null);
-        final bridge = _bridgeBaseUrl();
-        if (sourceId != null && bridge != null) {
-          _muslyBackendService.scrobble(
-            bridge,
-            videoId: sourceId,
-            title: _currentSong!.title,
-            artist: _currentSong!.artist,
-            album: _currentSong!.album,
-            duration: _currentSong!.duration,
-            submission: true,
-          ).catchError((e) {
-            debugPrint('YouTube scrobble on complete failed: $e');
+        if (!submission) {
+          _offlineService.flushPendingScrobbles(_subsonicService).catchError((e) {
+            debugPrint('Scrobble flush failed: $e');
           });
         }
       }
+    }
+
+    // 2. Bridge (music-pipeline) scrobble for YouTube & local tracks
+    final bridge = _bridgeBaseUrl();
+    if (bridge != null) {
+      final sourceId = song.sourceId ??
+          (song.id.startsWith('yt:') ? song.id.substring(3) : null);
+      _muslyBackendService.scrobble(
+        bridge,
+        videoId: sourceId,
+        songId: song.isYouTube ? null : song.id,
+        title: song.title,
+        artist: song.artist,
+        album: song.album,
+        duration: song.duration,
+        submission: submission,
+      ).catchError((e) {
+        debugPrint('Bridge scrobble failed: $e');
+      });
+    }
+  }
+
+  void _onSongComplete() {
+    if (_currentSong != null && !_hasScrobbledCurrentSong) {
+      _hasScrobbledCurrentSong = true;
+      _performScrobble(_currentSong!, submission: true);
     }
 
     if (_currentSong != null && _recommendationService != null) {
@@ -1252,37 +1244,7 @@ class PlayerProvider extends ChangeNotifier {
       }
 
       _hasScrobbledCurrentSong = false;
-      if (song.isLocal != true && !song.isYouTube) {
-        if (_offlineService.isOfflineMode) {
-          
-          _offlineService.queueScrobble(song.id, submission: false);
-        } else {
-          _subsonicService.scrobble(song.id, submission: false).catchError((e) {
-            _offlineService.queueScrobble(song.id, submission: false);
-          });
-
-          _offlineService.flushPendingScrobbles(_subsonicService).catchError((e) {
-            debugPrint('Scrobble flush failed: $e');
-          });
-        }
-      } else if (song.isYouTube) {
-        final sourceId = song.sourceId ??
-            (song.id.startsWith('yt:') ? song.id.substring(3) : null);
-        final bridge = _bridgeBaseUrl();
-        if (sourceId != null && bridge != null) {
-          _muslyBackendService.scrobble(
-            bridge,
-            videoId: sourceId,
-            title: song.title,
-            artist: song.artist,
-            album: song.album,
-            duration: song.duration,
-            submission: false,
-          ).catchError((e) {
-            debugPrint('YouTube now playing failed: $e');
-          });
-        }
-      }
+      _performScrobble(song, submission: false);
 
       if (_recommendationService != null) {
         _recommendationService!.trackSongPlay(
