@@ -129,10 +129,23 @@ class MuslyBackendService {
     return SearchResult(artists: const [], albums: const [], songs: songs);
   }
 
-  Future<String> resolveStreamUrl(String baseUrl, String videoId) async {
+  Future<String> resolveStreamUrl(
+    String baseUrl,
+    String videoId, {
+    String? title,
+    String? artist,
+    String? album,
+    int? duration,
+  }) async {
     final response = await _dio.post(
       '$baseUrl/api/stream',
-      data: {'videoId': videoId},
+      data: {
+        'videoId': videoId,
+        if (title != null) 'title': title,
+        if (artist != null) 'artist': artist,
+        if (album != null) 'album': album,
+        if (duration != null) 'duration': duration,
+      },
     );
     final payload = _toMap(response.data);
     final rawUrl = payload['streamUrl']?.toString() ?? '';
@@ -142,6 +155,30 @@ class MuslyBackendService {
     final cleanBase = baseUrl.endsWith('/') ? baseUrl.substring(0, baseUrl.length - 1) : baseUrl;
     final cleanPath = rawUrl.startsWith('/') ? rawUrl : '/$rawUrl';
     return '$cleanBase$cleanPath';
+  }
+
+  Future<void> scrobble(
+    String baseUrl, {
+    String? videoId,
+    String? songId,
+    String? title,
+    String? artist,
+    String? album,
+    int? duration,
+    bool submission = true,
+  }) async {
+    await _dio.post(
+      '$baseUrl/api/scrobble',
+      data: {
+        if (videoId != null) 'videoId': videoId,
+        if (songId != null) 'songId': songId,
+        if (title != null) 'title': title,
+        if (artist != null) 'artist': artist,
+        if (album != null) 'album': album,
+        if (duration != null) 'duration': duration,
+        'submission': submission,
+      },
+    );
   }
 
   Future<SaveResult> saveSong(
