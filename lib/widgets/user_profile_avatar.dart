@@ -31,30 +31,34 @@ class UserProfileAvatar extends StatelessWidget {
 
     final avatarUrl = bridgeUrl.isNotEmpty ? '$bridgeUrl/api/user/avatar' : '';
 
+    BoxDecoration circleDecoration({DecorationImage? image, Gradient? gradient}) {
+      return BoxDecoration(
+        shape: BoxShape.circle,
+        image: image,
+        gradient: gradient,
+        border: showBorder
+            ? Border.all(color: isDark ? Colors.white30 : Colors.black12, width: 1.5)
+            : null,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.15),
+            blurRadius: 3,
+            offset: const Offset(0, 1),
+          ),
+        ],
+      );
+    }
+
     Widget fallbackAvatar() {
       return Container(
         width: size,
         height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
+        decoration: circleDecoration(
           gradient: const LinearGradient(
             colors: [Color(0xFF1DB954), Color(0xFF191414)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
-          border: showBorder
-              ? Border.all(
-                  color: isDark ? Colors.white30 : Colors.black12,
-                  width: 1.5,
-                )
-              : null,
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.15),
-              blurRadius: 3,
-              offset: const Offset(0, 1),
-            ),
-          ],
         ),
         child: Center(
           child: Text(
@@ -76,23 +80,7 @@ class UserProfileAvatar extends StatelessWidget {
         imageBuilder: (context, imageProvider) => Container(
           width: size,
           height: size,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            image: DecorationImage(image: imageProvider, fit: BoxFit.cover),
-            border: showBorder
-                ? Border.all(
-                    color: isDark ? Colors.white30 : Colors.black12,
-                    width: 1.5,
-                  )
-                : null,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.15),
-                blurRadius: 3,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
+          decoration: circleDecoration(image: DecorationImage(image: imageProvider, fit: BoxFit.cover)),
         ),
         placeholder: (context, url) => fallbackAvatar(),
         errorWidget: (context, url, error) => fallbackAvatar(),
