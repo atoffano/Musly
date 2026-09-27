@@ -379,6 +379,36 @@ class MuslyBackendService {
     final response = await _dio.post('$baseUrl/api/spotify/migration/cancel');
     return _toMap(response.data);
   }
+
+  Future<Map<String, dynamic>> previewSpotifyPublicUrls(
+    String baseUrl,
+    String urls,
+  ) async {
+    final response = await _dio.post(
+      '$baseUrl/api/spotify/public/preview',
+      data: {'urls': urls},
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> startSpotifyUrlMigration(
+    String baseUrl, {
+    required String urls,
+    bool starLikedSongs = false,
+    bool createPlaylists = true,
+    List<String>? likedPlaylistNames,
+  }) async {
+    final response = await _dio.post(
+      '$baseUrl/api/spotify/public/start',
+      data: {
+        'urls': urls,
+        'starLikedSongs': starLikedSongs,
+        'createPlaylists': createPlaylists,
+        'likedPlaylistNames': likedPlaylistNames ?? const [],
+      },
+    );
+    return _toMap(response.data);
+  }
 }
 
 

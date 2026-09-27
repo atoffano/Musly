@@ -27,10 +27,20 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
   final TextEditingController _clientIdController = TextEditingController();
   final TextEditingController _manualCodeController = TextEditingController();
   final TextEditingController _playlistSearchController = TextEditingController();
+  final TextEditingController _urlInputController = TextEditingController();
 
-  int _currentStep = 0; // 0: Auth, 1: Selection, 2: Progress
+  int _importMode = 0; // 0: Fast URL Import (No Login), 1: Spotify OAuth (PKCE)
+  int _currentStep = 0; // 0: Auth/URLs, 1: Selection, 2: Progress
   bool _isLoading = false;
   String? _errorMessage;
+
+  // URL Import State
+  bool _urlStarLikedSongs = false;
+  bool _urlCreatePlaylists = true;
+  bool _isPreviewingUrls = false;
+  List<Map<String, dynamic>> _urlPreviewEntities = [];
+  List<String> _urlPreviewErrors = [];
+  int _urlTotalTracks = 0;
 
   // PKCE state
   String? _codeVerifier;
@@ -75,6 +85,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
     _clientIdController.dispose();
     _manualCodeController.dispose();
     _playlistSearchController.dispose();
+    _urlInputController.dispose();
     super.dispose();
   }
 
@@ -306,7 +317,103 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
   }
 
   // =========================================================================
-  // Migration Execution & Monitoring
+  // URL Migration Execution & Monitoring
+  // =========================================================================
+
+  Future<void> _previewUrls() async {
+    final input = _urlInputController.text.trim();
+    if (input.isEmpty) {
+      setState(() => _errorMessage = 'Please paste at least one Spotify playlist or album link.');
+      return;
+    }
+
+    final bridgeUrl = _getEffectiveBridgeUrl();
+    if (bridgeUrl.isEmpty) {
+      setState(() => _errorMessage = 'Music Pipeline bridge URL is unavailable.');
+      return;
+    }
+
+    setState(() {
+      _isPreviewingUrls = true;
+      _errorMessage = null;
+      _urlPreviewEntities = [];
+      _urlPreviewErrors = [];
+    });
+
+    try {
+      final result = await _backend.previewSpotifyPublicUrls(bridgeUrl, input);
+      if (mounted) {
+        final rawEntities = (result['entities'] as List?) ?? [];
+        final rawErrors = (result['errors'] as List?) ?? [];
+        setState(() {
+          _isPreviewingUrls = false;
+          _urlPreviewEntities = rawEntities
+              .whereType<Map>()
+              .map((e) => Map<String, dynamic>.from(e))
+              .toList();
+          _urlPreviewErrors = rawErrors.map((e) => e.toString()).toList();
+          _urlTotalTracks = (result['totalTracks'] as num?)?.toInt() ?? 0;
+          if (_urlPreviewEntities.isEmpty && _urlPreviewErrors.isNotEmpty) {
+            _errorMessage = _urlPreviewErrors.first;
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isPreviewingUrls = false;
+          _errorMessage = 'Failed to preview Spotify links: $e';
+        });
+      }
+    }
+  }
+
+  Future<void> _startUrlMigration() async {
+    final input = _urlInputController.text.trim();
+    if (input.isEmpty) {
+      setState(() => _errorMessage = 'Please paste at least one Spotify playlist or album link.');
+      return;
+    }
+
+    final bridgeUrl = _getEffectiveBridgeUrl();
+    if (bridgeUrl.isEmpty) {
+      setState(() => _errorMessage = 'Music Pipeline bridge URL is unavailable.');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final result = await _backend.startSpotifyUrlMigration(
+        bridgeUrl,
+        urls: input,
+        starLikedSongs: _urlStarLikedSongs,
+        createPlaylists: _urlCreatePlaylists,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _currentStep = 2; // Transition to live progress view
+          _migrationStatus = result['job'] as Map<String, dynamic>?;
+        });
+        _startStatusPolling();
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to start URL migration: $e';
+        });
+      }
+    }
+  }
+
+  // =========================================================================
+  // PKCE Migration Execution & Monitoring
   // =========================================================================
 
   Future<void> _startMigration() async {
@@ -422,6 +529,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
         child: Column(
           children: [
             _buildStepperHeader(),
+            if (_currentStep < 2) _buildModeSelector(),
             if (_errorMessage != null) _buildErrorBanner(_errorMessage!),
             Expanded(
               child: _isLoading && _currentStep != 2
@@ -434,7 +542,135 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
     );
   }
 
+  Widget _buildModeSelector() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: _isDark ? AppTheme.darkSurface : Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _isDark ? AppTheme.darkDivider : AppTheme.lightDivider,
+          width: 0.5,
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildModeTab(
+              mode: 0,
+              title: 'Public Links',
+              subtitle: 'Zero Setup • No Dev App',
+              icon: CupertinoIcons.link,
+            ),
+          ),
+          const SizedBox(width: 4),
+          Expanded(
+            child: _buildModeTab(
+              mode: 1,
+              title: 'Spotify OAuth',
+              subtitle: 'Developer API (PKCE)',
+              icon: CupertinoIcons.lock_shield,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeTab({
+    required int mode,
+    required String title,
+    required String subtitle,
+    required IconData icon,
+  }) {
+    final isSelected = _importMode == mode;
+    return InkWell(
+      onTap: () {
+        if (_importMode != mode) {
+          setState(() {
+            _importMode = mode;
+            _errorMessage = null;
+          });
+        }
+      },
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? (mode == 0 ? AppTheme.spotifyGreen : Theme.of(context).colorScheme.primary)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.15),
+                    blurRadius: 4,
+                    offset: const Offset(0, 2),
+                  )
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 18,
+              color: isSelected ? Colors.black : (_isDark ? AppTheme.darkSecondaryText : AppTheme.lightSecondaryText),
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                      color: isSelected ? Colors.black : (_isDark ? Colors.white : Colors.black),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: isSelected ? Colors.black87 : (_isDark ? AppTheme.darkSecondaryText : AppTheme.lightSecondaryText),
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildStepperHeader() {
+    if (_importMode == 0) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        decoration: BoxDecoration(
+          color: _isDark ? AppTheme.darkSurface : Colors.white,
+          border: Border(bottom: BorderSide(color: _isDark ? AppTheme.darkDivider : AppTheme.lightDivider, width: 0.5)),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            _buildStepIndicator(0, 'Paste Links', CupertinoIcons.link),
+            _buildStepDivider(0),
+            _buildStepIndicator(2, 'Migrate & Ingest', CupertinoIcons.arrow_2_circlepath_circle),
+          ],
+        ),
+      );
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
       decoration: BoxDecoration(
@@ -531,14 +767,647 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
   Widget _buildCurrentStepView() {
     switch (_currentStep) {
       case 0:
-        return _buildAuthStep();
+        return _importMode == 0 ? _buildUrlImportStep() : _buildAuthStep();
       case 1:
         return _buildSelectionStep();
       case 2:
         return _buildProgressStep();
       default:
-        return _buildAuthStep();
+        return _importMode == 0 ? _buildUrlImportStep() : _buildAuthStep();
     }
+  }
+
+  // =========================================================================
+  // URL Import Step (Zero-Auth / Public Embed Scraper)
+  // =========================================================================
+
+  Widget _buildUrlImportStep() {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        _buildUrlHeroBanner(),
+        const SizedBox(height: 16),
+        _buildLikedSongsGuideCard(),
+        const SizedBox(height: 16),
+        _buildUrlInputFieldCard(),
+        const SizedBox(height: 16),
+        _buildUrlOptionsCard(),
+        if (_isPreviewingUrls) ...[
+          const SizedBox(height: 20),
+          Center(
+            child: Column(
+              children: [
+                const CircularProgressIndicator(color: AppTheme.spotifyGreen),
+                const SizedBox(height: 12),
+                Text(
+                  'Fetching Spotify playlists & track metadata...',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: _isDark ? AppTheme.darkSecondaryText : AppTheme.lightSecondaryText,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+        if (_urlPreviewEntities.isNotEmpty || _urlPreviewErrors.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          _buildUrlPreviewResults(),
+        ],
+        const SizedBox(height: 24),
+        _buildUrlActionButtons(),
+        const SizedBox(height: 40),
+      ],
+    );
+  }
+
+  Widget _buildUrlHeroBanner() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            AppTheme.spotifyGreen.withValues(alpha: 0.18),
+            _isDark ? AppTheme.darkSurface : Colors.white,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.spotifyGreen.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: const BoxDecoration(
+                  color: AppTheme.spotifyGreen,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(CupertinoIcons.link, color: Colors.black, size: 22),
+              ),
+              const SizedBox(width: 12),
+              const Icon(CupertinoIcons.arrow_right, size: 18, color: AppTheme.spotifyGreen),
+              const SizedBox(width: 12),
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(CupertinoIcons.cloud_download, color: Colors.white, size: 22),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.spotifyGreen.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(CupertinoIcons.checkmark_seal_fill, size: 13, color: AppTheme.spotifyGreen),
+                    SizedBox(width: 4),
+                    Text(
+                      'Zero Setup',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppTheme.spotifyGreen),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Spotify to Navidrome Migration',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Paste your public Spotify playlist or album links below to import all songs into Navidrome. No Spotify Developer account, client secrets, or OAuth login required!',
+            style: TextStyle(
+              fontSize: 13,
+              color: _isDark ? AppTheme.darkSecondaryText : AppTheme.lightSecondaryText,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLikedSongsGuideCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: _isDark ? AppTheme.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.pinkAccent.withValues(alpha: 0.3),
+          width: 1,
+        ),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.pinkAccent.withValues(alpha: 0.15),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(CupertinoIcons.heart_fill, color: Colors.pinkAccent, size: 20),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Migrating "Liked Songs" (15-Second Trick)',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Convert your private Liked Songs into a link in 4 quick steps on desktop:',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _buildGuideStepRow('1', 'Open Spotify Desktop app and click "Liked Songs" in the sidebar.'),
+          const SizedBox(height: 8),
+          _buildGuideStepRow('2', 'Press Ctrl + A (or Cmd + A on Mac) to select all songs.'),
+          const SizedBox(height: 8),
+          _buildGuideStepRow('3', 'Right-click → Add to playlist → New playlist (e.g. "Liked Songs").'),
+          const SizedBox(height: 8),
+          _buildGuideStepRow('4', 'Right-click the new playlist → Share → Copy link to playlist, then paste below!'),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppTheme.spotifyGreen.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.spotifyGreen.withValues(alpha: 0.3)),
+            ),
+            child: const Row(
+              children: [
+                Icon(CupertinoIcons.info_circle_fill, color: AppTheme.spotifyGreen, size: 16),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Tip: Enable "Star as Liked Songs in Navidrome" below so imported tracks become your Navidrome favorites!',
+                    style: TextStyle(fontSize: 12, color: AppTheme.spotifyGreen),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGuideStepRow(String stepNumber, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 20,
+          height: 20,
+          margin: const EdgeInsets.only(top: 1),
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: _isDark ? AppTheme.darkDivider : Colors.grey.shade300,
+            shape: BoxShape.circle,
+          ),
+          child: Text(
+            stepNumber,
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 13,
+              color: _isDark ? Colors.white70 : Colors.black87,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildUrlInputFieldCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: _isDark ? AppTheme.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: _isDark ? AppTheme.darkDivider : AppTheme.lightDivider,
+          width: 0.5,
+        ),
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Row(
+                children: [
+                  Icon(CupertinoIcons.link, size: 18, color: AppTheme.spotifyGreen),
+                  SizedBox(width: 8),
+                  Text(
+                    'Playlist or Album Links',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    icon: const Icon(CupertinoIcons.doc_on_clipboard, size: 14),
+                    label: const Text('Paste', style: TextStyle(fontSize: 12)),
+                    onPressed: () async {
+                      final data = await Clipboard.getData(Clipboard.kTextPlain);
+                      if (data?.text?.isNotEmpty == true) {
+                        final current = _urlInputController.text.trim();
+                        final pasted = data!.text!.trim();
+                        if (current.isEmpty) {
+                          _urlInputController.text = pasted;
+                        } else {
+                          _urlInputController.text = '$current\n$pasted';
+                        }
+                        setState(() {});
+                      }
+                    },
+                  ),
+                  if (_urlInputController.text.isNotEmpty) ...[
+                    const SizedBox(width: 4),
+                    TextButton(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('Clear', style: TextStyle(fontSize: 12, color: Colors.redAccent)),
+                      onPressed: () {
+                        setState(() {
+                          _urlInputController.clear();
+                          _urlPreviewEntities.clear();
+                          _urlPreviewErrors.clear();
+                          _urlTotalTracks = 0;
+                        });
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'Input one or more Spotify playlist or album links (separated by line breaks):',
+            style: TextStyle(
+              fontSize: 12,
+              color: _isDark ? AppTheme.darkSecondaryText : AppTheme.lightSecondaryText,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _urlInputController,
+            minLines: 4,
+            maxLines: 8,
+            keyboardType: TextInputType.multiline,
+            style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+            decoration: InputDecoration(
+              hintText: 'https://open.spotify.com/playlist/5snGUvVaIZjnAZ2VJayTgZ\nhttps://open.spotify.com/playlist/...',
+              hintStyle: TextStyle(
+                fontFamily: 'monospace',
+                fontSize: 12,
+                color: _isDark ? Colors.white30 : Colors.black26,
+              ),
+              filled: true,
+              fillColor: _isDark ? AppTheme.darkBackground : Colors.grey.shade100,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: _isDark ? AppTheme.darkDivider : AppTheme.lightDivider),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: _isDark ? AppTheme.darkDivider : AppTheme.lightDivider),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: const BorderSide(color: AppTheme.spotifyGreen, width: 1.5),
+              ),
+              contentPadding: const EdgeInsets.all(12),
+            ),
+            onChanged: (_) {
+              if (_urlPreviewEntities.isNotEmpty) {
+                setState(() {
+                  _urlPreviewEntities.clear();
+                  _urlPreviewErrors.clear();
+                  _urlTotalTracks = 0;
+                });
+              }
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUrlOptionsCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: _isDark ? AppTheme.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: _isDark ? AppTheme.darkDivider : AppTheme.lightDivider,
+          width: 0.5,
+        ),
+      ),
+      child: Column(
+        children: [
+          SwitchListTile(
+            secondary: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.pinkAccent.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(CupertinoIcons.heart_fill, color: Colors.pinkAccent, size: 18),
+            ),
+            title: const Text('Star as Liked Songs in Navidrome', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            subtitle: Text(
+              'Tracks will be starred/favorited in Navidrome & Musly',
+              style: TextStyle(fontSize: 12, color: _isDark ? AppTheme.darkSecondaryText : AppTheme.lightSecondaryText),
+            ),
+            value: _urlStarLikedSongs,
+            activeColor: Colors.pinkAccent,
+            onChanged: (val) => setState(() => _urlStarLikedSongs = val),
+          ),
+          Divider(height: 1, color: _isDark ? AppTheme.darkDivider : AppTheme.lightDivider),
+          SwitchListTile(
+            secondary: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: AppTheme.spotifyGreen.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(CupertinoIcons.music_albums, color: AppTheme.spotifyGreen, size: 18),
+            ),
+            title: const Text('Create Navidrome Playlists', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+            subtitle: Text(
+              'Build matching playlists in Navidrome with the same name',
+              style: TextStyle(fontSize: 12, color: _isDark ? AppTheme.darkSecondaryText : AppTheme.lightSecondaryText),
+            ),
+            value: _urlCreatePlaylists,
+            activeColor: AppTheme.spotifyGreen,
+            onChanged: (val) => setState(() => _urlCreatePlaylists = val),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUrlPreviewResults() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_urlPreviewErrors.isNotEmpty) ...[
+          ..._urlPreviewErrors.map((err) => Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.amber.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.amber.withValues(alpha: 0.4)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(CupertinoIcons.exclamationmark_triangle_fill, color: Colors.amber, size: 16),
+                    const SizedBox(width: 8),
+                    Expanded(child: Text(err, style: const TextStyle(fontSize: 12, color: Colors.amber))),
+                  ],
+                ),
+              )),
+          const SizedBox(height: 8),
+        ],
+        if (_urlPreviewEntities.isNotEmpty) ...[
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Ready to Import (${_urlPreviewEntities.length} ${_urlPreviewEntities.length == 1 ? "collection" : "collections"})',
+                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppTheme.spotifyGreen.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  '$_urlTotalTracks total tracks',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppTheme.spotifyGreen),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ..._urlPreviewEntities.map((entity) => _buildPreviewEntityCard(entity)),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildPreviewEntityCard(Map<String, dynamic> entity) {
+    final name = entity['name']?.toString() ?? 'Unnamed Playlist';
+    final subtitle = entity['subtitle']?.toString() ?? '';
+    final coverUrl = entity['coverArtUrl']?.toString();
+    final tracks = (entity['tracks'] as List?) ?? [];
+    final type = entity['type']?.toString() ?? 'playlist';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: _isDark ? AppTheme.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: _isDark ? AppTheme.darkDivider : AppTheme.lightDivider,
+          width: 0.5,
+        ),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: coverUrl != null && coverUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: coverUrl,
+                        width: 52,
+                        height: 52,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => _buildPlaceholderArt(),
+                      )
+                    : _buildPlaceholderArt(),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: type == 'album'
+                                ? Colors.purple.withValues(alpha: 0.2)
+                                : AppTheme.spotifyGreen.withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            type.toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.bold,
+                              color: type == 'album' ? Colors.purpleAccent : AppTheme.spotifyGreen,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            name,
+                            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle.isNotEmpty ? '$subtitle • ${tracks.length} tracks' : '${tracks.length} tracks',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: _isDark ? AppTheme.darkSecondaryText : AppTheme.lightSecondaryText,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (tracks.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: tracks.take(3).map((t) {
+                final tMap = t is Map ? t : {};
+                final title = tMap['title']?.toString() ?? '';
+                final artist = tMap['artist']?.toString() ?? '';
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _isDark ? AppTheme.darkBackground : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: _isDark ? AppTheme.darkDivider : AppTheme.lightDivider),
+                  ),
+                  child: Text(
+                    artist.isNotEmpty ? '$title - $artist' : title,
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: _isDark ? Colors.white70 : Colors.black87,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUrlActionButtons() {
+    final hasLinks = _urlInputController.text.trim().isNotEmpty;
+
+    return Column(
+      children: [
+        FilledButton.icon(
+          style: FilledButton.styleFrom(
+            backgroundColor: AppTheme.spotifyGreen,
+            foregroundColor: Colors.black,
+            minimumSize: const Size(double.infinity, 52),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          ),
+          icon: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.black),
+                )
+              : const Icon(CupertinoIcons.play_fill, size: 18),
+          label: Text(
+            _urlPreviewEntities.isNotEmpty
+                ? 'Start Ingestion (${_urlTotalTracks} tracks)'
+                : 'Import Playlists Now',
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+          ),
+          onPressed: _isLoading || !hasLinks ? null : _startUrlMigration,
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 44),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          icon: _isPreviewingUrls
+              ? const SizedBox(
+                  width: 16,
+                  height: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(CupertinoIcons.eye, size: 16),
+          label: const Text('Preview / Check Links'),
+          onPressed: _isPreviewingUrls || !hasLinks ? null : _previewUrls,
+        ),
+      ],
+    );
   }
 
   // =========================================================================
