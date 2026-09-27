@@ -283,7 +283,104 @@ class MuslyBackendService {
     final payload = _toMap(response.data);
     return payload['logs']?.toString() ?? '';
   }
+
+  // =========================================================================
+  // Spotify Migration
+  // =========================================================================
+
+  Future<Map<String, dynamic>> getSpotifyConfig(String baseUrl) async {
+    final response = await _dio.get('$baseUrl/api/spotify/config');
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> initSpotifyPkce(
+    String baseUrl, {
+    required String clientId,
+    required String redirectUri,
+  }) async {
+    final response = await _dio.post(
+      '$baseUrl/api/spotify/pkce/init',
+      data: {
+        'clientId': clientId,
+        'redirectUri': redirectUri,
+      },
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> exchangeSpotifyPkce(
+    String baseUrl, {
+    required String clientId,
+    required String code,
+    required String codeVerifier,
+    required String redirectUri,
+  }) async {
+    final response = await _dio.post(
+      '$baseUrl/api/spotify/pkce/token',
+      data: {
+        'clientId': clientId,
+        'code': code,
+        'codeVerifier': codeVerifier,
+        'redirectUri': redirectUri,
+      },
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> getLatestSpotifyCallback(String baseUrl) async {
+    final response = await _dio.get('$baseUrl/api/spotify/callback/latest');
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> getSpotifySummary(String baseUrl) async {
+    final response = await _dio.get('$baseUrl/api/spotify/summary');
+    return _toMap(response.data);
+  }
+
+  Future<List<Map<String, dynamic>>> getSpotifyPlaylists(String baseUrl) async {
+    final response = await _dio.get('$baseUrl/api/spotify/playlists');
+    final payload = _toMap(response.data);
+    final list = (payload['playlists'] as List?) ?? const [];
+    return list.whereType<Map>().map((m) => _toMap(m)).toList();
+  }
+
+  Future<List<Map<String, dynamic>>> getSpotifyAlbums(String baseUrl) async {
+    final response = await _dio.get('$baseUrl/api/spotify/albums');
+    final payload = _toMap(response.data);
+    final list = (payload['albums'] as List?) ?? const [];
+    return list.whereType<Map>().map((m) => _toMap(m)).toList();
+  }
+
+  Future<Map<String, dynamic>> startSpotifyMigration(
+    String baseUrl, {
+    bool importAll = true,
+    bool importLikedSongs = true,
+    List<String> playlistIds = const [],
+    List<String> albumIds = const [],
+  }) async {
+    final response = await _dio.post(
+      '$baseUrl/api/spotify/migration/start',
+      data: {
+        'importAll': importAll,
+        'importLikedSongs': importLikedSongs,
+        'playlistIds': playlistIds,
+        'albumIds': albumIds,
+      },
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> getSpotifyMigrationStatus(String baseUrl) async {
+    final response = await _dio.get('$baseUrl/api/spotify/migration/status');
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> cancelSpotifyMigration(String baseUrl) async {
+    final response = await _dio.post('$baseUrl/api/spotify/migration/cancel');
+    return _toMap(response.data);
+  }
 }
+
 
 class MoodSection {
   final String name;
