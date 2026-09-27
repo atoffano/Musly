@@ -288,84 +288,49 @@ class MuslyBackendService {
   // Spotify Migration
   // =========================================================================
 
-  Future<Map<String, dynamic>> getSpotifyConfig(String baseUrl) async {
-    final response = await _dio.get('$baseUrl/api/spotify/config');
+  Future<Map<String, dynamic>> previewSpotifyDump(
+    String baseUrl, {
+    String path = '',
+  }) async {
+    final response = await _dio.post(
+      '$baseUrl/api/spotify/dump/preview',
+      data: {'path': path},
+    );
     return _toMap(response.data);
   }
 
-  Future<Map<String, dynamic>> initSpotifyPkce(
+  Future<Map<String, dynamic>> startSpotifyDumpMigration(
     String baseUrl, {
-    required String clientId,
-    required String redirectUri,
+    String path = '',
+    bool importLibrary = true,
+    bool importPlaylists = true,
+    List<String> selectedPlaylists = const [],
+    bool importScrobbles = true,
+    bool syncScrobblesListenbrainz = false,
+    bool syncScrobblesLastfm = false,
   }) async {
     final response = await _dio.post(
-      '$baseUrl/api/spotify/pkce/init',
+      '$baseUrl/api/spotify/dump/start',
       data: {
-        'clientId': clientId,
-        'redirectUri': redirectUri,
+        'path': path,
+        'importLibrary': importLibrary,
+        'importPlaylists': importPlaylists,
+        'selectedPlaylists': selectedPlaylists,
+        'importScrobbles': importScrobbles,
+        'syncScrobblesListenbrainz': syncScrobblesListenbrainz,
+        'syncScrobblesLastfm': syncScrobblesLastfm,
       },
     );
     return _toMap(response.data);
   }
 
-  Future<Map<String, dynamic>> exchangeSpotifyPkce(
-    String baseUrl, {
-    required String clientId,
-    required String code,
-    required String codeVerifier,
-    required String redirectUri,
-  }) async {
+  Future<Map<String, dynamic>> uploadSpotifyDump(
+    String baseUrl,
+    FormData formData,
+  ) async {
     final response = await _dio.post(
-      '$baseUrl/api/spotify/pkce/token',
-      data: {
-        'clientId': clientId,
-        'code': code,
-        'codeVerifier': codeVerifier,
-        'redirectUri': redirectUri,
-      },
-    );
-    return _toMap(response.data);
-  }
-
-  Future<Map<String, dynamic>> getLatestSpotifyCallback(String baseUrl) async {
-    final response = await _dio.get('$baseUrl/api/spotify/callback/latest');
-    return _toMap(response.data);
-  }
-
-  Future<Map<String, dynamic>> getSpotifySummary(String baseUrl) async {
-    final response = await _dio.get('$baseUrl/api/spotify/summary');
-    return _toMap(response.data);
-  }
-
-  Future<List<Map<String, dynamic>>> getSpotifyPlaylists(String baseUrl) async {
-    final response = await _dio.get('$baseUrl/api/spotify/playlists');
-    final payload = _toMap(response.data);
-    final list = (payload['playlists'] as List?) ?? const [];
-    return list.whereType<Map>().map((m) => _toMap(m)).toList();
-  }
-
-  Future<List<Map<String, dynamic>>> getSpotifyAlbums(String baseUrl) async {
-    final response = await _dio.get('$baseUrl/api/spotify/albums');
-    final payload = _toMap(response.data);
-    final list = (payload['albums'] as List?) ?? const [];
-    return list.whereType<Map>().map((m) => _toMap(m)).toList();
-  }
-
-  Future<Map<String, dynamic>> startSpotifyMigration(
-    String baseUrl, {
-    bool importAll = true,
-    bool importLikedSongs = true,
-    List<String> playlistIds = const [],
-    List<String> albumIds = const [],
-  }) async {
-    final response = await _dio.post(
-      '$baseUrl/api/spotify/migration/start',
-      data: {
-        'importAll': importAll,
-        'importLikedSongs': importLikedSongs,
-        'playlistIds': playlistIds,
-        'albumIds': albumIds,
-      },
+      '$baseUrl/api/spotify/dump/upload',
+      data: formData,
     );
     return _toMap(response.data);
   }
