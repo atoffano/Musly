@@ -18,6 +18,8 @@ import 'artist_screen.dart';
 import 'radio_screen.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/album_artwork.dart' show isLocalFilePath;
+import '../widgets/user_profile_avatar.dart';
+import '../widgets/settings_sheet.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -43,6 +45,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
             floating: true,
             expandedHeight: 60,
             backgroundColor: isDark ? AppTheme.darkBackground : Colors.white,
+            leading: const Padding(
+              padding: EdgeInsets.only(left: 12.0),
+              child: Center(
+                child: UserProfileAvatar(size: 32),
+              ),
+            ),
+            leadingWidth: 48,
             title: Text(
               AppLocalizations.of(context)!.yourLibrary,
               style: TextStyle(
@@ -650,11 +659,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
   }
 
   void _showSettings(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => const _SettingsSheet(),
-    );
+    showSettingsSheet(context);
   }
 }
 
@@ -747,125 +752,6 @@ class _SpotifyLibraryTile extends StatelessWidget {
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _SettingsSheet extends StatelessWidget {
-  const _SettingsSheet();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final authProvider = Provider.of<AuthProvider>(context);
-
-    return Container(
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurface : Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            Container(
-              width: 36,
-              height: 5,
-              decoration: BoxDecoration(
-                color: isDark ? AppTheme.darkDivider : AppTheme.lightDivider,
-                borderRadius: BorderRadius.circular(2.5),
-              ),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              AppLocalizations.of(context)!.settingsTitle,
-              style: theme.textTheme.headlineMedium,
-            ),
-            const SizedBox(height: 24),
-            if (authProvider.config != null) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: isDark
-                        ? AppTheme.darkCard
-                        : AppTheme.lightBackground,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        authProvider.state == AuthState.offlineMode
-                            ? CupertinoIcons.wifi_slash
-                            : CupertinoIcons.checkmark_circle_fill,
-                        color: authProvider.state == AuthState.offlineMode
-                            ? Colors.orange
-                            : Colors.green,
-                        size: 24,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              authProvider.state == AuthState.offlineMode
-                                  ? AppLocalizations.of(context)!.offlineMode
-                                  : AppLocalizations.of(context)!.connected,
-                              style: theme.textTheme.titleMedium,
-                            ),
-                            Text(
-                              authProvider.config!.serverUrl,
-                              style: theme.textTheme.bodySmall,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-            ListTile(
-              leading: Icon(
-                CupertinoIcons.gear_alt,
-                color: isDark ? Colors.white : Colors.black87,
-              ),
-              title: Text(AppLocalizations.of(context)!.settingsTitle),
-              trailing: Icon(
-                CupertinoIcons.chevron_forward,
-                size: 18,
-                color: isDark ? AppTheme.darkDivider : AppTheme.lightDivider,
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                NavigationHelper.push(context, const SettingsScreen());
-              },
-            ),
-            ListTile(
-              leading: const Icon(
-                CupertinoIcons.arrow_right_square,
-                color: Colors.red,
-              ),
-              title: Text(AppLocalizations.of(context)!.logout),
-              onTap: () async {
-                Navigator.pop(context);
-                await Provider.of<PlayerProvider>(context, listen: false).stop();
-                await authProvider.logout();
-              },
-            ),
-            const SizedBox(height: 32),
-          ],
-        ),
         ),
       ),
     );

@@ -92,8 +92,15 @@ class _HomeScreenState extends State<HomeScreen> {
             floating: true,
             expandedHeight: isDesktop ? 80 : 70,
             backgroundColor: isDark ? AppTheme.darkBackground : Colors.white,
+            leading: const Padding(
+              padding: EdgeInsets.only(left: 12.0),
+              child: Center(
+                child: UserProfileAvatar(size: 32),
+              ),
+            ),
+            leadingWidth: 48,
             flexibleSpace: FlexibleSpaceBar(
-              titlePadding: EdgeInsets.only(left: hPad, bottom: 14),
+              titlePadding: EdgeInsets.only(left: isDesktop ? 60 : 54, bottom: 14),
               title: Text(
                 _getGreeting(),
                 style: TextStyle(
