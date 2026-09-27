@@ -170,12 +170,19 @@ class _SearchScreenState extends State<SearchScreen> {
                 pinned: true,
                 floating: true,
                 expandedHeight: 120,
+                leading: const Padding(
+                  padding: EdgeInsets.only(left: 12.0),
+                  child: Center(
+                    child: UserProfileAvatar(size: 32),
+                  ),
+                ),
+                leadingWidth: 48,
                 flexibleSpace: FlexibleSpaceBar(
                   title: Text(
                     AppLocalizations.of(context)!.searchTitle,
                     style: theme.appBarTheme.titleTextStyle,
                   ),
-                  titlePadding: const EdgeInsets.only(left: 16, bottom: 60),
+                  titlePadding: const EdgeInsets.only(left: 54, bottom: 60),
                 ),
                 bottom: PreferredSize(
                   preferredSize: const Size.fromHeight(56),

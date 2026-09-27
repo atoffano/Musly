@@ -68,6 +68,32 @@ class SaveResult {
   }
 }
 
+class UserProfile {
+  final String displayName;
+  final bool hasAvatar;
+  final String avatarUrl;
+  final String? largeImageUrl;
+  final String? imageUrl;
+
+  UserProfile({
+    required this.displayName,
+    required this.hasAvatar,
+    required this.avatarUrl,
+    this.largeImageUrl,
+    this.imageUrl,
+  });
+
+  factory UserProfile.fromJson(Map<dynamic, dynamic> json) {
+    return UserProfile(
+      displayName: json['displayName']?.toString() ?? 'Aki',
+      hasAvatar: json['hasAvatar'] == true,
+      avatarUrl: json['avatarUrl']?.toString() ?? '/api/user/avatar',
+      largeImageUrl: json['largeImageUrl']?.toString(),
+      imageUrl: json['imageUrl']?.toString(),
+    );
+  }
+}
+
 class MuslyBackendService {
   final Dio _dio;
   static MuslyBackendService? _instance;
@@ -82,6 +108,21 @@ class MuslyBackendService {
   MuslyBackendService._internal(Dio dio) : _dio = dio {
     _dio.options.connectTimeout = const Duration(seconds: 30);
     _dio.options.receiveTimeout = const Duration(seconds: 30);
+  }
+
+  Future<UserProfile?> getUserProfile(String baseUrl) async {
+    if (baseUrl.isEmpty) return null;
+    try {
+      final response = await _dio.get('$baseUrl/api/user/profile');
+      return UserProfile.fromJson(_toMap(response.data));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String getUserAvatarUrl(String baseUrl) {
+    if (baseUrl.isEmpty) return '';
+    return '$baseUrl/api/user/avatar';
   }
 
 
