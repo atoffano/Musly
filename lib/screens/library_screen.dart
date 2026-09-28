@@ -395,7 +395,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
       onTap: () => _openItem(context, item),
       onLongPress: item.type == 'Playlist'
           ? () => _showPlaylistOptionsSheet(context, item)
-          : null,
+          : item.type == 'Album'
+              ? () => _showAlbumOptionsSheet(context, item)
+              : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         child: Row(
@@ -600,8 +602,13 @@ class _LibraryScreenState extends State<LibraryScreen> {
   void _showDeletePlaylistWithSongsDialog(BuildContext context, _LibraryItem item) {
     showDialog(
       context: context,
-      builder: (dialogContext) => _DeletePlaylistWithSongsDialog(
-        name: item.name,
+      builder: (dialogContext) => _DeleteConfirmDialog(
+        title: 'Delete & Remove Songs',
+        message:
+            'This will delete the playlist "${item.name}" and permanently '
+            'remove its songs from your library. The audio files will be '
+            'deleted and cannot be recovered.',
+        confirmLabel: 'Delete & Remove',
         onDelete: () async {
           final libraryProvider =
               Provider.of<LibraryProvider>(dialogContext, listen: false);
@@ -631,6 +638,69 @@ class _LibraryScreenState extends State<LibraryScreen> {
             messenger.showSnackBar(
               SnackBar(
                 content: const Text('Failed to delete playlist'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  void _showAlbumOptionsSheet(BuildContext context, _LibraryItem item) {
+    if (_isPlaylistActionBusy) return;
+
+    showAlbumOptionsSheet(
+      context,
+      title: item.name,
+      onDelete: () {
+        if (_isPlaylistActionBusy) return;
+        Navigator.pop(context);
+        _showDeleteAlbumDialog(context, item);
+      },
+    );
+  }
+
+  void _showDeleteAlbumDialog(BuildContext context, _LibraryItem item) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _DeleteConfirmDialog(
+        title: 'Delete Album',
+        message:
+            'This will permanently delete the album "${item.name}" and its '
+            'songs from your library. The audio files will be deleted and '
+            'cannot be recovered.',
+        confirmLabel: 'Delete Album',
+        onDelete: () async {
+          final libraryProvider =
+              Provider.of<LibraryProvider>(dialogContext, listen: false);
+          _isPlaylistActionBusy = true;
+          int? removed;
+          bool succeeded = false;
+          try {
+            removed = await libraryProvider.deleteAlbum(item.id);
+            succeeded = true;
+          } finally {
+            _isPlaylistActionBusy = false;
+          }
+          return (succeeded, removed ?? 0);
+        },
+        onResult: (succeeded, removed) {
+          final messenger = ScaffoldMessenger.of(context);
+          if (succeeded) {
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Album deleted - $removed songs removed from library',
+                ),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          } else {
+            messenger.showSnackBar(
+              SnackBar(
+                content: const Text('Failed to delete album'),
                 behavior: SnackBarBehavior.floating,
                 backgroundColor: Colors.red,
               ),
@@ -753,24 +823,26 @@ class _LibraryItem {
   });
 }
 
-class _DeletePlaylistWithSongsDialog extends StatefulWidget {
-  final String name;
+class _DeleteConfirmDialog extends StatefulWidget {
+  final String title;
+  final String message;
+  final String confirmLabel;
   final Future<(bool, int)> Function() onDelete;
   final void Function(bool succeeded, int removed) onResult;
 
-  const _DeletePlaylistWithSongsDialog({
-    required this.name,
+  const _DeleteConfirmDialog({
+    required this.title,
+    required this.message,
+    required this.confirmLabel,
     required this.onDelete,
     required this.onResult,
   });
 
   @override
-  State<_DeletePlaylistWithSongsDialog> createState() =>
-      _DeletePlaylistWithSongsDialogState();
+  State<_DeleteConfirmDialog> createState() => _DeleteConfirmDialogState();
 }
 
-class _DeletePlaylistWithSongsDialogState
-    extends State<_DeletePlaylistWithSongsDialog> {
+class _DeleteConfirmDialogState extends State<_DeleteConfirmDialog> {
   bool _isDeleting = false;
 
   Future<void> _confirmDelete() async {
@@ -788,14 +860,10 @@ class _DeletePlaylistWithSongsDialogState
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Delete & Remove Songs'),
+      title: Text(widget.title),
       content: _isDeleting
           ? const Center(child: CircularProgressIndicator())
-          : Text(
-              'This will delete the playlist "${widget.name}" and permanently '
-              'remove its songs from your library. The audio files will be '
-              'deleted and cannot be recovered.',
-            ),
+          : Text(widget.message),
       actions: [
         TextButton(
           onPressed: _isDeleting ? null : () => Navigator.pop(context),
@@ -804,7 +872,7 @@ class _DeletePlaylistWithSongsDialogState
         TextButton(
           onPressed: _isDeleting ? null : _confirmDelete,
           style: TextButton.styleFrom(foregroundColor: Colors.red),
-          child: const Text('Delete & Remove'),
+          child: Text(widget.confirmLabel),
         ),
       ],
     );
