@@ -419,18 +419,18 @@ class MuslyBackendService {
 
   Future<Map<String, dynamic>> previewSpotifyDump(
     String baseUrl, {
-    String path = '',
+    List<String> paths = const [],
   }) async {
     final response = await _dio.post(
       '$baseUrl/api/spotify/dump/preview',
-      data: {'path': path},
+      data: {'paths': paths},
     );
     return _toMap(response.data);
   }
 
   Future<Map<String, dynamic>> startSpotifyDumpMigration(
     String baseUrl, {
-    String path = '',
+    List<String> paths = const [],
     bool importLibrary = true,
     bool importPlaylists = true,
     List<String> selectedPlaylists = const [],
@@ -441,7 +441,7 @@ class MuslyBackendService {
     final response = await _dio.post(
       '$baseUrl/api/spotify/dump/start',
       data: {
-        'path': path,
+        'paths': paths,
         'importLibrary': importLibrary,
         'importPlaylists': importPlaylists,
         'selectedPlaylists': selectedPlaylists,
@@ -460,6 +460,17 @@ class MuslyBackendService {
     final response = await _dio.post(
       '$baseUrl/api/spotify/dump/upload',
       data: formData,
+    );
+    return _toMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> addSpotifyDumpSource(
+    String baseUrl, {
+    required String path,
+  }) async {
+    final response = await _dio.post(
+      '$baseUrl/api/spotify/dump/add-source',
+      data: {'path': path},
     );
     return _toMap(response.data);
   }
