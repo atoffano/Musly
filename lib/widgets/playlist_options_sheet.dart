@@ -133,7 +133,7 @@ class PlaylistOptionsSheet extends StatelessWidget {
 
               ListTile(
                 leading: const Icon(
-                  CupertinoIcons.trash_solid_fill,
+                  CupertinoIcons.trash_fill,
                   color: Colors.red,
                 ),
                 title: const Text(
