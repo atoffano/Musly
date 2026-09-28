@@ -10,7 +10,6 @@ import '../utils/navigation_helper.dart';
 import 'album_screen.dart';
 import 'package:musly/screens/playlist_screen.dart';
 import 'favorites_screen.dart';
-import 'settings_screen.dart';
 import 'all_albums_screen.dart';
 import 'all_songs_screen.dart';
 import 'library_search_delegate.dart';
@@ -19,7 +18,6 @@ import 'radio_screen.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/album_artwork.dart' show isLocalFilePath;
 import '../widgets/user_profile_avatar.dart';
-import '../widgets/settings_sheet.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -45,13 +43,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
             floating: true,
             expandedHeight: 60,
             backgroundColor: isDark ? AppTheme.darkBackground : Colors.white,
-            leading: const Padding(
-              padding: EdgeInsets.only(left: 12.0),
-              child: Center(
-                child: UserProfileAvatar(size: 32),
-              ),
-            ),
-            leadingWidth: 48,
             title: Text(
               AppLocalizations.of(context)!.yourLibrary,
               style: TextStyle(
@@ -89,12 +80,9 @@ class _LibraryScreenState extends State<LibraryScreen> {
                 ),
                 onPressed: () => _showCreatePlaylistDialog(context),
               ),
-              IconButton(
-                icon: Icon(
-                  CupertinoIcons.gear,
-                  color: isDark ? Colors.white : Colors.black,
-                ),
-                onPressed: () => _showSettings(context),
+              const Padding(
+                padding: EdgeInsets.only(right: 8.0),
+                child: UserProfileAvatar(size: 32),
               ),
             ],
           ),
@@ -656,10 +644,6 @@ class _LibraryScreenState extends State<LibraryScreen> {
         isDark: isDark,
       ),
     );
-  }
-
-  void _showSettings(BuildContext context) {
-    showSettingsSheet(context);
   }
 }
 

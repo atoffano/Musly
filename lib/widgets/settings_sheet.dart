@@ -211,7 +211,7 @@ class _SettingsSheetState extends State<SettingsSheet> {
                   CupertinoIcons.doc_text_search,
                   color: isDark ? Colors.white70 : Colors.black54,
                 ),
-                title: const Text('Pipeline Logs'),
+                title: const Text('Logs'),
                 trailing: Icon(
                   CupertinoIcons.chevron_forward,
                   size: 18,
