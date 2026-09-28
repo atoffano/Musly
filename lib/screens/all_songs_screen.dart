@@ -27,6 +27,7 @@ class AllSongsScreen extends StatefulWidget {
 class _AllSongsScreenState extends State<AllSongsScreen> {
   List<Song> _songs = [];
   List<Song> _sortedSongs = [];
+  Map<String, DateTime> _addedDates = {};
   bool _isLoading = true;
   final ScrollController _scrollController = ScrollController();
   SongSortOption _currentSort = SongSortOption.recentlyAdded;
@@ -64,6 +65,18 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
         _isLoading = false;
       });
     }
+
+    if (mounted) _loadAddedDates();
+  }
+
+  Future<void> _loadAddedDates() async {
+    final libraryProvider = Provider.of<LibraryProvider>(context, listen: false);
+    final dates = await libraryProvider.getSongsAddedDates();
+    if (!mounted || dates.isEmpty) return;
+    setState(() {
+      _addedDates = {..._addedDates, ...dates};
+      if (_currentSort == SongSortOption.recentlyAdded) _sortSongs();
+    });
   }
 
   Future<void> _refreshSongs() async {
@@ -113,7 +126,22 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
         );
         break;
       case SongSortOption.recentlyAdded:
-        _sortedSongs = List.from(_songs.reversed);
+        if (_addedDates.isEmpty) {
+          _sortedSongs = List.from(_songs.reversed);
+        } else {
+          _sortedSongs.sort((a, b) {
+            final da = _addedDates[a.id];
+            final db = _addedDates[b.id];
+            if (da == null && db == null) {
+              return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+            }
+            if (da == null) return 1;
+            if (db == null) return -1;
+            final dateCmp = db.compareTo(da);
+            if (dateCmp != 0) return dateCmp;
+            return a.title.toLowerCase().compareTo(b.title.toLowerCase());
+          });
+        }
         break;
     }
   }
@@ -235,6 +263,9 @@ class _AllSongsScreenState extends State<AllSongsScreen> {
     if (!_isLoading && !identical(providerSongs, _songs)) {
       _songs = providerSongs;
       _sortSongs();
+      if (_addedDates.isEmpty) {
+        _loadAddedDates();
+      }
     }
 
     return Scaffold(

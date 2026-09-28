@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../models/song.dart';
 import 'subsonic_service.dart';
@@ -64,6 +65,45 @@ class SaveResult {
       jobId: json['jobId']?.toString() ?? '',
       status: json['status']?.toString() ?? 'failed',
       deduplicated: json['deduplicated'] == true,
+    );
+  }
+}
+
+class BatchDeleteResult {
+  final int deleted;
+  final int failed;
+  final List<String> failedIds;
+
+  BatchDeleteResult({
+    required this.deleted,
+    required this.failed,
+    required this.failedIds,
+  });
+
+  factory BatchDeleteResult.fromJson(Map<dynamic, dynamic> json) {
+    int asInt(dynamic value) {
+      if (value is int) return value;
+      if (value is num) return value.toInt();
+      return int.tryParse(value?.toString() ?? '') ?? 0;
+    }
+
+    final failedIds = <String>[];
+    final errors = json['errors'];
+    if (errors is List) {
+      for (final error in errors) {
+        if (error is Map) {
+          final songId = error['songId']?.toString();
+          if (songId != null && songId.isNotEmpty) {
+            failedIds.add(songId);
+          }
+        }
+      }
+    }
+
+    return BatchDeleteResult(
+      deleted: asInt(json['deleted']),
+      failed: asInt(json['failed']),
+      failedIds: failedIds,
     );
   }
 }
@@ -262,6 +302,54 @@ class MuslyBackendService {
     );
     final payload = _toMap(response.data);
     return payload['status']?.toString() == 'removed';
+  }
+
+  Future<Map<String, DateTime>> getSongsAddedDates(String baseUrl) async {
+    if (baseUrl.isEmpty) return {};
+    try {
+      final response = await _dio.get('$baseUrl/api/library/songs-added');
+      final payload = _toMap(response.data);
+      final rawDates = payload['addedDates'];
+      if (rawDates is! Map) return {};
+      final result = <String, DateTime>{};
+      rawDates.forEach((key, value) {
+        final date = DateTime.tryParse(value?.toString() ?? '');
+        if (date != null) {
+          result[key.toString()] = date;
+        }
+      });
+      return result;
+    } catch (e) {
+      debugPrint('Error fetching songs added dates: $e');
+      return {};
+    }
+  }
+
+  Future<BatchDeleteResult> deleteSongsBatch(
+    String baseUrl,
+    List<String> songIds,
+  ) async {
+    if (baseUrl.isEmpty) {
+      return BatchDeleteResult(
+        deleted: 0,
+        failed: songIds.length,
+        failedIds: List<String>.from(songIds),
+      );
+    }
+    try {
+      final response = await _dio.post(
+        '$baseUrl/api/delete/batch',
+        data: {'songIds': songIds},
+      );
+      return BatchDeleteResult.fromJson(_toMap(response.data));
+    } catch (e) {
+      debugPrint('Error deleting songs batch: $e');
+      return BatchDeleteResult(
+        deleted: 0,
+        failed: songIds.length,
+        failedIds: List<String>.from(songIds),
+      );
+    }
   }
 
   Future<List<MoodSection>> getMoodCategories(String baseUrl) async {
