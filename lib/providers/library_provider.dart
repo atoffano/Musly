@@ -739,6 +739,62 @@ class LibraryProvider extends ChangeNotifier {
     await loadPlaylists();
   }
 
+  Future<Map<String, DateTime>> getSongsAddedDates() async {
+    final bridgeUrl = _bridgeBaseUrl();
+    if (bridgeUrl == null) return {};
+    return _muslyBackendService.getSongsAddedDates(bridgeUrl);
+  }
+
+  Future<String> duplicatePlaylist(String playlistId) async {
+    final playlist = await getPlaylist(playlistId);
+    final songIds =
+        playlist.songs?.map((s) => s.id).toList() ?? const <String>[];
+
+    final base = playlist.name;
+    String candidate = '$base (Copy)';
+    int copyNumber = 2;
+    while (_playlists.any(
+      (p) => p.name.toLowerCase() == candidate.toLowerCase(),
+    )) {
+      candidate = '$base (Copy $copyNumber)';
+      copyNumber++;
+    }
+
+    await createPlaylist(candidate, songIds: songIds);
+    return candidate;
+  }
+
+  Future<int> deletePlaylistWithSongs(String playlistId) async {
+    final playlist = await getPlaylist(playlistId);
+    final songIds =
+        playlist.songs?.map((s) => s.id).toList() ?? const <String>[];
+
+    await deletePlaylist(playlistId);
+
+    int removed = 0;
+    final bridgeUrl = _bridgeBaseUrl();
+    if (bridgeUrl != null && songIds.isNotEmpty) {
+      final result =
+          await _muslyBackendService.deleteSongsBatch(bridgeUrl, songIds);
+      removed = result.deleted;
+      // Only songs the bridge confirmed are gone leave the local cache;
+      // when the bridge is unreachable nothing is pruned (songs still exist).
+      final removedIds =
+          songIds.where((id) => !result.failedIds.contains(id)).toSet();
+      if (result.deleted > 0 && removedIds.isNotEmpty) {
+        _cachedAllSongs = _cachedAllSongs
+            .where((s) => !removedIds.contains(s.id))
+            .toList();
+        _randomSongs =
+            _randomSongs.where((s) => !removedIds.contains(s.id)).toList();
+        await _saveCachedData();
+        notifyListeners();
+      }
+    }
+
+    return removed;
+  }
+
   Future<void> addSongToPlaylist(String playlistId, String songId) async {
     await _subsonicService.updatePlaylist(
       playlistId: playlistId,

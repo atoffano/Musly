@@ -18,6 +18,7 @@ import 'radio_screen.dart';
 import '../l10n/app_localizations.dart';
 import '../widgets/album_artwork.dart' show isLocalFilePath;
 import '../widgets/user_profile_avatar.dart';
+import '../widgets/playlist_options_sheet.dart';
 
 class LibraryScreen extends StatefulWidget {
   const LibraryScreen({super.key});
@@ -29,6 +30,7 @@ class LibraryScreen extends StatefulWidget {
 class _LibraryScreenState extends State<LibraryScreen> {
   String _selectedFilter = 'All';
   final List<String> _filters = ['All', 'Faves', 'Albums', 'Artists', 'Songs'];
+  bool _isPlaylistActionBusy = false;
 
   @override
   Widget build(BuildContext context) {
@@ -392,7 +394,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
     return InkWell(
       onTap: () => _openItem(context, item),
       onLongPress: item.type == 'Playlist'
-          ? () => _showDeletePlaylistDialog(context, item)
+          ? () => _showPlaylistOptionsSheet(context, item)
           : null,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -551,6 +553,94 @@ class _LibraryScreenState extends State<LibraryScreen> {
     );
   }
 
+  void _showPlaylistOptionsSheet(BuildContext context, _LibraryItem item) {
+    if (_isPlaylistActionBusy) return;
+
+    showPlaylistOptionsSheet(
+      context,
+      title: item.name,
+      onDuplicate: () async {
+        final messenger = ScaffoldMessenger.of(context);
+        final libraryProvider =
+            Provider.of<LibraryProvider>(context, listen: false);
+        _isPlaylistActionBusy = true;
+        try {
+          final name = await libraryProvider.duplicatePlaylist(item.id);
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text('Duplicated as "$name"'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } catch (e) {
+          messenger.showSnackBar(
+            SnackBar(
+              content: const Text('Failed to duplicate playlist'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.red,
+            ),
+          );
+        } finally {
+          _isPlaylistActionBusy = false;
+        }
+      },
+      onDelete: () {
+        if (_isPlaylistActionBusy) return;
+        Navigator.pop(context);
+        _showDeletePlaylistDialog(context, item);
+      },
+      onDeleteWithSongs: () {
+        if (_isPlaylistActionBusy) return;
+        Navigator.pop(context);
+        _showDeletePlaylistWithSongsDialog(context, item);
+      },
+    );
+  }
+
+  void _showDeletePlaylistWithSongsDialog(BuildContext context, _LibraryItem item) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _DeletePlaylistWithSongsDialog(
+        name: item.name,
+        onDelete: () async {
+          final libraryProvider =
+              Provider.of<LibraryProvider>(dialogContext, listen: false);
+          _isPlaylistActionBusy = true;
+          int? removed;
+          bool succeeded = false;
+          try {
+            removed = await libraryProvider.deletePlaylistWithSongs(item.id);
+            succeeded = true;
+          } finally {
+            _isPlaylistActionBusy = false;
+          }
+          return (succeeded, removed ?? 0);
+        },
+        onResult: (succeeded, removed) {
+          final messenger = ScaffoldMessenger.of(context);
+          if (succeeded) {
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Playlist deleted - $removed songs removed from library',
+                ),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          } else {
+            messenger.showSnackBar(
+              SnackBar(
+                content: const Text('Failed to delete playlist'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
   void _showCreatePlaylistDialog(BuildContext context) {
     final controller = TextEditingController();
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -661,6 +751,64 @@ class _LibraryItem {
     required this.subtitle,
     this.coverArt,
   });
+}
+
+class _DeletePlaylistWithSongsDialog extends StatefulWidget {
+  final String name;
+  final Future<(bool, int)> Function() onDelete;
+  final void Function(bool succeeded, int removed) onResult;
+
+  const _DeletePlaylistWithSongsDialog({
+    required this.name,
+    required this.onDelete,
+    required this.onResult,
+  });
+
+  @override
+  State<_DeletePlaylistWithSongsDialog> createState() =>
+      _DeletePlaylistWithSongsDialogState();
+}
+
+class _DeletePlaylistWithSongsDialogState
+    extends State<_DeletePlaylistWithSongsDialog> {
+  bool _isDeleting = false;
+
+  Future<void> _confirmDelete() async {
+    if (_isDeleting) return;
+    setState(() => _isDeleting = true);
+    final result = await widget.onDelete();
+    final succeeded = result.$1;
+    final removed = result.$2;
+    if (mounted) {
+      Navigator.pop(context);
+    }
+    widget.onResult(succeeded, removed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Delete & Remove Songs'),
+      content: _isDeleting
+          ? const Center(child: CircularProgressIndicator())
+          : Text(
+              'This will delete the playlist "${widget.name}" and permanently '
+              'remove its songs from your library. The audio files will be '
+              'deleted and cannot be recovered.',
+            ),
+      actions: [
+        TextButton(
+          onPressed: _isDeleting ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: _isDeleting ? null : _confirmDelete,
+          style: TextButton.styleFrom(foregroundColor: Colors.red),
+          child: const Text('Delete & Remove'),
+        ),
+      ],
+    );
+  }
 }
 
 class _SpotifyLibraryTile extends StatelessWidget {

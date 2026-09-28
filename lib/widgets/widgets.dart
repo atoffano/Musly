@@ -13,3 +13,4 @@ export 'star_rating_widget.dart';
 export 'youtube_music_logo.dart';
 export 'user_profile_avatar.dart';
 export 'settings_sheet.dart';
+export 'playlist_options_sheet.dart';
