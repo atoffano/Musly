@@ -117,7 +117,7 @@ class _HomeScreenState extends State<HomeScreen> {
               if (isDesktop) const SizedBox(width: 8),
               const Padding(
                 padding: EdgeInsets.only(right: 8.0),
-                child: UserProfileAvatar(size: 38),
+                child: UserProfileAvatar(size: 42),
               ),
             ],
           ),

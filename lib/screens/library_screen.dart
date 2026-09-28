@@ -84,7 +84,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               ),
               const Padding(
                 padding: EdgeInsets.only(right: 8.0),
-                child: UserProfileAvatar(size: 32),
+                child: UserProfileAvatar(size: 42),
               ),
             ],
           ),

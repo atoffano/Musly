@@ -180,7 +180,7 @@ class _SearchScreenState extends State<SearchScreen> {
                 actions: [
                   const Padding(
                     padding: EdgeInsets.only(right: 8.0),
-                    child: UserProfileAvatar(size: 38),
+                    child: UserProfileAvatar(size: 42),
                   ),
                 ],
                 bottom: PreferredSize(
