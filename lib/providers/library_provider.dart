@@ -807,6 +807,9 @@ class LibraryProvider extends ChangeNotifier {
 
     final result =
         await _muslyBackendService.deleteSongsBatch(bridgeUrl, songIds);
+    if (result.deleted == 0) {
+      throw Exception('No songs could be deleted');
+    }
 
     // Only songs the bridge confirmed are gone leave the local cache; the
     // album itself disappears from Navidrome once all its files are deleted.
