@@ -795,6 +795,39 @@ class LibraryProvider extends ChangeNotifier {
     return removed;
   }
 
+  Future<int> deleteAlbum(String albumId) async {
+    final songs = await getAlbumSongs(albumId);
+    final songIds = songs.map((s) => s.id).toList();
+    final bridgeUrl = _bridgeBaseUrl();
+    if (bridgeUrl == null || songIds.isEmpty) {
+      throw Exception(
+        'Album cannot be deleted: bridge unavailable or album has no songs',
+      );
+    }
+
+    final result =
+        await _muslyBackendService.deleteSongsBatch(bridgeUrl, songIds);
+
+    // Only songs the bridge confirmed are gone leave the local cache; the
+    // album itself disappears from Navidrome once all its files are deleted.
+    final removedIds =
+        songIds.where((id) => !result.failedIds.contains(id)).toSet();
+    if (result.deleted > 0 && removedIds.isNotEmpty) {
+      _cachedAllSongs = _cachedAllSongs
+          .where((s) => !removedIds.contains(s.id))
+          .toList();
+      _randomSongs =
+          _randomSongs.where((s) => !removedIds.contains(s.id)).toList();
+      _recentAlbums = _recentAlbums.where((a) => a.id != albumId).toList();
+      _cachedAllAlbums =
+          _cachedAllAlbums.where((a) => a.id != albumId).toList();
+      await _saveCachedData();
+      notifyListeners();
+    }
+
+    return result.deleted;
+  }
+
   Future<void> addSongToPlaylist(String playlistId, String songId) async {
     await _subsonicService.updatePlaylist(
       playlistId: playlistId,

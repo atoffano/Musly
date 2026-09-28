@@ -6,9 +6,11 @@ import '../theme/app_theme.dart';
 Future<void> showPlaylistOptionsSheet(
   BuildContext context, {
   required String title,
-  required VoidCallback onDuplicate,
-  required VoidCallback onDelete,
-  required VoidCallback onDeleteWithSongs,
+  String subtitle = 'Playlist',
+  String deleteLabel = 'Delete',
+  VoidCallback? onDuplicate,
+  VoidCallback? onDelete,
+  VoidCallback? onDeleteWithSongs,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -16,6 +18,8 @@ Future<void> showPlaylistOptionsSheet(
     isScrollControlled: true,
     builder: (context) => PlaylistOptionsSheet(
       title: title,
+      subtitle: subtitle,
+      deleteLabel: deleteLabel,
       onDuplicate: onDuplicate,
       onDelete: onDelete,
       onDeleteWithSongs: onDeleteWithSongs,
@@ -23,18 +27,37 @@ Future<void> showPlaylistOptionsSheet(
   );
 }
 
+/// Single-action variant used for albums: no duplicate, no keep-songs option.
+Future<void> showAlbumOptionsSheet(
+  BuildContext context, {
+  required String title,
+  required VoidCallback onDelete,
+}) {
+  return showPlaylistOptionsSheet(
+    context,
+    title: title,
+    subtitle: 'Album',
+    deleteLabel: 'Delete Album',
+    onDelete: onDelete,
+  );
+}
+
 class PlaylistOptionsSheet extends StatelessWidget {
   final String title;
-  final VoidCallback onDuplicate;
-  final VoidCallback onDelete;
-  final VoidCallback onDeleteWithSongs;
+  final String subtitle;
+  final String deleteLabel;
+  final VoidCallback? onDuplicate;
+  final VoidCallback? onDelete;
+  final VoidCallback? onDeleteWithSongs;
 
   const PlaylistOptionsSheet({
     super.key,
     required this.title,
-    required this.onDuplicate,
-    required this.onDelete,
-    required this.onDeleteWithSongs,
+    this.subtitle = 'Playlist',
+    this.deleteLabel = 'Delete',
+    this.onDuplicate,
+    this.onDelete,
+    this.onDeleteWithSongs,
   });
 
   @override
@@ -98,7 +121,7 @@ class PlaylistOptionsSheet extends StatelessWidget {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        'Playlist',
+                        subtitle,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: isDark ? Colors.white70 : Colors.black54,
                         ),
@@ -110,38 +133,41 @@ class PlaylistOptionsSheet extends StatelessWidget {
 
               const SizedBox(height: 8),
 
-              ListTile(
-                leading: Icon(
-                  CupertinoIcons.doc_on_doc,
-                  color: isDark ? Colors.white : Colors.black87,
+              if (onDuplicate != null)
+                ListTile(
+                  leading: Icon(
+                    CupertinoIcons.doc_on_doc,
+                    color: isDark ? Colors.white : Colors.black87,
+                  ),
+                  title: const Text('Duplicate'),
+                  onTap: onDuplicate,
                 ),
-                title: const Text('Duplicate'),
-                onTap: onDuplicate,
-              ),
 
-              ListTile(
-                leading: const Icon(
-                  CupertinoIcons.trash,
-                  color: Colors.red,
+              if (onDelete != null)
+                ListTile(
+                  leading: const Icon(
+                    CupertinoIcons.trash,
+                    color: Colors.red,
+                  ),
+                  title: Text(
+                    deleteLabel,
+                    style: const TextStyle(color: Colors.red),
+                  ),
+                  onTap: onDelete,
                 ),
-                title: const Text(
-                  'Delete',
-                  style: TextStyle(color: Colors.red),
-                ),
-                onTap: onDelete,
-              ),
 
-              ListTile(
-                leading: const Icon(
-                  CupertinoIcons.trash_fill,
-                  color: Colors.red,
+              if (onDeleteWithSongs != null)
+                ListTile(
+                  leading: const Icon(
+                    CupertinoIcons.trash_fill,
+                    color: Colors.red,
+                  ),
+                  title: const Text(
+                    'Delete & Remove Songs',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                  onTap: onDeleteWithSongs,
                 ),
-                title: const Text(
-                  'Delete & Remove Songs',
-                  style: TextStyle(color: Colors.red),
-                ),
-                onTap: onDeleteWithSongs,
-              ),
 
               const SizedBox(height: 24),
             ],
