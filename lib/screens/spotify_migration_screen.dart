@@ -20,9 +20,8 @@ class SpotifyMigrationScreen extends StatefulWidget {
 class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
   final MuslyBackendService _backend = MuslyBackendService();
   final TextEditingController _urlInputController = TextEditingController();
-  final TextEditingController _dumpPathController = TextEditingController(
-    text: '/home/aki/docker/music-pipeline/my_spotify_data(2).zip',
-  );
+  final TextEditingController _dumpAccountPathController = TextEditingController();
+  final TextEditingController _dumpHistoryPathController = TextEditingController();
   final ScrollController _logScrollController = ScrollController();
 
   int _importMode = 0; // 0: Fast URL Route, 1: Complete GDPR Dump Route
@@ -45,6 +44,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
   // ---------------------------------------------------------------------------
   bool _isInspectingDump = false;
   Map<String, dynamic>? _dumpSummary;
+  List<Map<String, dynamic>> _dumpSources = [];
   bool _dumpImportLibrary = true;
   bool _dumpImportPlaylists = true;
   final Set<String> _dumpSelectedPlaylists = {};
@@ -68,33 +68,42 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
   @override
   void initState() {
     super.initState();
-    _checkInitialRunningMigration();
+    _restoreMigrationState();
   }
 
   @override
   void dispose() {
     _statusPollTimer?.cancel();
     _urlInputController.dispose();
-    _dumpPathController.dispose();
+    _dumpAccountPathController.dispose();
+    _dumpHistoryPathController.dispose();
     _logScrollController.dispose();
     super.dispose();
   }
 
-  Future<void> _checkInitialRunningMigration() async {
+  Future<void> _restoreMigrationState() async {
     final bridgeUrl = _getEffectiveBridgeUrl();
     if (bridgeUrl.isEmpty) return;
 
     try {
       final status = await _backend.getSpotifyMigrationStatus(bridgeUrl);
-      if (status['status'] == 'running') {
-        if (mounted) {
-          setState(() {
-            _currentStep = 2;
-            _migrationStatus = status;
-          });
-          _startStatusPolling();
-        }
+      if (!mounted) return;
+      final stateStr = status['status']?.toString();
+      if (stateStr == 'running') {
+        setState(() {
+          _currentStep = 2;
+          _migrationStatus = status;
+        });
+        _startStatusPolling();
+      } else if (stateStr == 'completed' || stateStr == 'failed' || stateStr == 'cancelled') {
+        // Restore the final state of the last run (stats, playlists, logs are
+        // kept in memory by the backend). No polling for terminal states.
+        setState(() {
+          _currentStep = 2;
+          _migrationStatus = status;
+        });
       }
+      // idle (or unknown) -> stay on step 1
     } catch (_) {}
   }
 
@@ -220,8 +229,21 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
   // Slow Route Actions (GDPR Dump)
   // ===========================================================================
 
+  List<String> _collectDumpPaths() {
+    return [
+      _dumpAccountPathController.text.trim(),
+      _dumpHistoryPathController.text.trim(),
+    ].where((p) => p.isNotEmpty).toList();
+  }
+
   Future<void> _inspectDump() async {
-    final path = _dumpPathController.text.trim();
+    final paths = _collectDumpPaths();
+    if (paths.isEmpty) {
+      setState(() =>
+          _errorMessage = 'Enter at least one dump path: Account Data and/or Extended Streaming History.');
+      return;
+    }
+
     final bridgeUrl = _getEffectiveBridgeUrl();
     if (bridgeUrl.isEmpty) {
       setState(() => _errorMessage = 'Bridge URL is not configured.');
@@ -234,11 +256,24 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
     });
 
     try {
-      final res = await _backend.previewSpotifyDump(bridgeUrl, path: path);
+      final res = await _backend.previewSpotifyDump(bridgeUrl, paths: paths);
       if (mounted) {
         setState(() {
           _isInspectingDump = false;
-          _dumpSummary = res['summary'] is Map ? Map<String, dynamic>.from(res['summary']) : null;
+          _dumpSources = (res['sources'] as List?)
+                  ?.whereType<Map>()
+                  .map((s) => Map<String, dynamic>.from(s))
+                  .toList() ??
+              [];
+          // Merged summary drives the stats grid & playlist checkboxes;
+          // fall back to the legacy single-source summary when absent.
+          Map<String, dynamic>? summary;
+          if (res['merged'] is Map) {
+            summary = Map<String, dynamic>.from(res['merged']);
+          } else if (res['summary'] is Map) {
+            summary = Map<String, dynamic>.from(res['summary']);
+          }
+          _dumpSummary = summary;
           // By default, select all playlists
           if (_dumpSummary != null && _dumpSummary!['playlists'] is List) {
             _dumpSelectedPlaylists.clear();
@@ -261,6 +296,13 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
   }
 
   Future<void> _startDumpMigration() async {
+    final paths = _collectDumpPaths();
+    if (paths.isEmpty) {
+      setState(() =>
+          _errorMessage = 'Enter at least one dump path: Account Data and/or Extended Streaming History.');
+      return;
+    }
+
     final bridgeUrl = _getEffectiveBridgeUrl();
     if (bridgeUrl.isEmpty) return;
 
@@ -272,7 +314,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
     try {
       final res = await _backend.startSpotifyDumpMigration(
         bridgeUrl,
-        path: _dumpPathController.text.trim(),
+        paths: paths,
         importLibrary: _dumpImportLibrary,
         importPlaylists: _dumpImportPlaylists,
         selectedPlaylists: _dumpSelectedPlaylists.toList(),
@@ -727,9 +769,9 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
 
         const SizedBox(height: 16),
 
-        // Dump Path Input
+        // Dump Path Inputs (one or both zips / folders)
         Text(
-          'Spotify Data Dump Path (.zip or uncompressed folder)',
+          'Spotify GDPR Dump (zip or folder)',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 13.5,
@@ -737,15 +779,58 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
           ),
         ),
         const SizedBox(height: 6),
+        Text(
+          'Account Data (zip or folder)',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: _isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+          ),
+        ),
+        const SizedBox(height: 4),
         TextField(
-          controller: _dumpPathController,
+          controller: _dumpAccountPathController,
           style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
           decoration: InputDecoration(
-            hintText: '/home/aki/docker/music-pipeline/my_spotify_data(2).zip',
+            hintText: '/home/aki/docker/music-pipeline/my_spotify_account_data.zip',
+            helperText: 'Identity/profile, liked songs (YourLibrary), playlists, recent history.',
+            helperMaxLines: 2,
             filled: true,
             fillColor: _isDark ? AppTheme.darkSurface : Colors.grey.shade100,
             border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Extended Streaming History (zip or folder)',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: _isDark ? Colors.grey.shade300 : Colors.grey.shade700,
+          ),
+        ),
+        const SizedBox(height: 4),
+        TextField(
+          controller: _dumpHistoryPathController,
+          style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+          decoration: InputDecoration(
+            hintText: '/home/aki/docker/music-pipeline/my_spotify_streaming_history.zip',
+            helperText: 'Full streaming backlog used to rebuild scrobbles.',
+            helperMaxLines: 2,
+            filled: true,
+            fillColor: _isDark ? AppTheme.darkSurface : Colors.grey.shade100,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Tip: the two zips can be run at once or independently — the server remembers which sources were already migrated, so adding the second one later only processes what is new.',
+          style: TextStyle(
+            fontSize: 11,
+            height: 1.4,
+            color: _isDark ? Colors.grey.shade500 : Colors.grey.shade600,
           ),
         ),
 
@@ -764,6 +849,17 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         ),
+
+        if (_dumpSources.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          // Per-Source Cards (one per detected dump part)
+          Text(
+            'Detected Sources (${_dumpSources.length})',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: _isDark ? Colors.white : Colors.black87),
+          ),
+          const SizedBox(height: 8),
+          for (final source in _dumpSources) _buildSourceCard(source),
+        ],
 
         if (_dumpSummary != null) ...[
           const SizedBox(height: 20),
@@ -890,7 +986,10 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
                 children: [
                   CheckboxListTile(
                     title: const Text('Sync with ListenBrainz', style: TextStyle(fontSize: 12)),
-                    subtitle: const Text('Submits plays via ListenBrainz user token', style: TextStyle(fontSize: 10.5)),
+                    subtitle: const Text(
+                      'Off by default: your scrobble history is already uploaded. Enable only to push scrobbles to ListenBrainz.',
+                      style: TextStyle(fontSize: 10.5),
+                    ),
                     value: _dumpSyncListenbrainz,
                     onChanged: (val) => setState(() => _dumpSyncListenbrainz = val ?? false),
                     controlAffinity: ListTileControlAffinity.leading,
@@ -899,7 +998,10 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
                   ),
                   CheckboxListTile(
                     title: const Text('Sync with Last.fm', style: TextStyle(fontSize: 12)),
-                    subtitle: const Text('Submits eligible plays in trailing 14-day window', style: TextStyle(fontSize: 10.5)),
+                    subtitle: const Text(
+                      'Off by default: your scrobble history is already uploaded. Enable only to push scrobbles to Last.fm.',
+                      style: TextStyle(fontSize: 10.5),
+                    ),
                     value: _dumpSyncLastfm,
                     onChanged: (val) => setState(() => _dumpSyncLastfm = val ?? false),
                     controlAffinity: ListTileControlAffinity.leading,
@@ -971,6 +1073,142 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
   }
 
   // ===========================================================================
+  // 2b. Source Card Helpers (per detected dump part)
+  // ===========================================================================
+
+  Widget _buildKindBadge(String kind) {
+    String label;
+    Color color;
+    switch (kind) {
+      case 'account_data':
+        label = 'Account Data';
+        color = AppTheme.spotifyGreen;
+        break;
+      case 'streaming_history':
+        label = 'Streaming History';
+        color = Colors.orangeAccent;
+        break;
+      case 'mixed':
+        label = 'Mixed';
+        color = Colors.purpleAccent;
+        break;
+      default:
+        label = 'Unknown';
+        color = _isDark ? Colors.grey.shade400 : Colors.grey.shade600;
+    }
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.5)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.bold, color: color),
+      ),
+    );
+  }
+
+  Widget _buildSourceCount(String label, dynamic count) {
+    return Column(
+      children: [
+        Text('$count', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 2),
+        Text(label, style: TextStyle(fontSize: 10, color: _isDark ? Colors.grey.shade400 : Colors.grey.shade600)),
+      ],
+    );
+  }
+
+  Widget _buildSourceCard(Map<String, dynamic> source) {
+    final kind = source['kind']?.toString() ?? 'unknown';
+    final path = source['path']?.toString() ?? '';
+    final summary = source['summary'] is Map ? Map<String, dynamic>.from(source['summary']) : <String, dynamic>{};
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: _isDark ? AppTheme.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: _isDark ? AppTheme.darkDivider : AppTheme.lightDivider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _buildKindBadge(kind),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  path,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontFamily: 'monospace',
+                    color: _isDark ? Colors.grey.shade500 : Colors.grey.shade600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: _buildSourceCount('Playlists', summary['playlistsCount'] ?? 0)),
+              Expanded(child: _buildSourceCount('Tracks', summary['libraryTracksCount'] ?? 0)),
+              Expanded(child: _buildSourceCount('Albums', summary['libraryAlbumsCount'] ?? 0)),
+              Expanded(child: _buildSourceCount('Scrobbles', summary['scrobblesCount'] ?? 0)),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSourceStatusRow(Map<String, dynamic> source) {
+    final migrated = source['migratedAt'] != null && (source['migratedAt']?.toString() ?? '').isNotEmpty;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: _isDark ? AppTheme.darkSurface : Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: _isDark ? AppTheme.darkDivider : AppTheme.lightDivider),
+      ),
+      child: Row(
+        children: [
+          _buildKindBadge(source['kind']?.toString() ?? 'unknown'),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              source['path']?.toString() ?? '',
+              style: TextStyle(
+                fontSize: 11,
+                fontFamily: 'monospace',
+                color: _isDark ? Colors.grey.shade400 : Colors.grey.shade600,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            migrated ? 'migrated' : 'not migrated',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: migrated ? AppTheme.spotifyGreen : Colors.orangeAccent,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ===========================================================================
   // 3. Shared Live Progress Dashboard
   // ===========================================================================
 
@@ -987,6 +1225,11 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
     final currentTrack = status['currentTrack'] is Map ? Map<String, dynamic>.from(status['currentTrack']) : null;
     final logs = (status['recentLogs'] as List?)?.map((l) => l.toString()).toList() ?? [];
     final playlists = (status['createdPlaylists'] as List?)?.map((p) => p.toString()).toList() ?? [];
+    final sources = (status['sources'] as List?)
+            ?.whereType<Map>()
+            .map((s) => Map<String, dynamic>.from(s))
+            .toList() ??
+        [];
 
     final progressVal = total > 0 ? (processed / total).clamp(0.0, 1.0) : 0.0;
     final isDone = stateStr == 'completed';
@@ -1138,6 +1381,13 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
             runSpacing: 6,
             children: playlists.map((p) => Chip(label: Text(p, style: const TextStyle(fontSize: 11)))).toList(),
           ),
+        ],
+
+        if (sources.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Text('Sources (${sources.length})', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+          const SizedBox(height: 6),
+          for (final s in sources) _buildSourceStatusRow(s),
         ],
 
         const SizedBox(height: 16),
