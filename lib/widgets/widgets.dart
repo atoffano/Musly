@@ -18,12 +18,15 @@ export 'common/multi_artist_widget.dart';
 export 'common/media_play_button.dart';
 export 'common/pill_tab_bar.dart';
 export 'common/song_tile.dart';
+export 'common/user_profile_avatar.dart';
+export 'common/youtube_music_logo.dart';
 
 export 'dialogs/privacy_policy_dialog.dart';
 export 'dialogs/support_dialog.dart';
 
 export 'modals/song_options_modal.dart';
 export 'modals/server_switcher_sheet.dart';
+export 'modals/playlist_options_sheet.dart';
 
 export 'navigation/desktop_navigation_sidebar.dart';
 export 'navigation/desktop_player_bar.dart';

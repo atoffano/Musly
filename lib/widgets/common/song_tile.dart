@@ -184,31 +184,102 @@ class SongTile extends StatelessWidget {
     );
   }
 
+  bool _canToggleLibrarySaved(Song song) {
+    return song.isYouTube ||
+        (song.sourceId != null && song.sourceId!.isNotEmpty) ||
+        song.id.startsWith('yt:');
+  }
+
   Widget _buildTrailing(BuildContext context) {
-    if (showDuration && song.duration != null && song.duration! > 0) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (_canToggleLibrarySaved(song))
+          Selector<PlayerProvider, ({bool saved, bool busy})>(
+            selector: (_, provider) => (
+              saved: provider.isYouTubeSaved(song),
+              busy: provider.isYouTubeSaveBusy(song),
+            ),
+            builder: (context, state, _) {
+              return Padding(
+                padding: EdgeInsets.only(right: state.busy ? 12 : 4),
+                child: state.busy
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : IconButton(
+                        visualDensity: VisualDensity.compact,
+                        constraints:
+                            const BoxConstraints(minWidth: 28, minHeight: 28),
+                        padding: EdgeInsets.zero,
+                        tooltip: state.saved
+                            ? 'Remove from library'
+                            : 'Add to library',
+                        onPressed: () async {
+                          final playerProvider = Provider.of<PlayerProvider>(
+                            context,
+                            listen: false,
+                          );
+                          final messenger = ScaffoldMessenger.of(context);
+
+                          try {
+                            await playerProvider.toggleYouTubeSaved(song);
+                            if (!context.mounted) {
+                              return;
+                            }
+                            final nowSaved =
+                                playerProvider.isYouTubeSaved(song);
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  nowSaved
+                                      ? 'Saving to library started'
+                                      : 'Removed from library',
+                                ),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          } catch (e) {
+                            if (!context.mounted) {
+                              return;
+                            }
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text('Save action failed: $e'),
+                                duration: const Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        },
+                        icon: Icon(
+                          state.saved
+                              ? Icons.check_circle_rounded
+                              : Icons.add_circle_outline_rounded,
+                          size: 18,
+                          color: state.saved
+                              ? const Color(0xFF1DB954)
+                              : Theme.of(context).textTheme.bodySmall?.color,
+                        ),
+                      ),
+              );
+            },
+          ),
+        if (showDuration && song.duration != null && song.duration! > 0) ...[
           Text(
             FormatUtils.formatSeconds(song.duration),
             style: const TextStyle(fontSize: 12, color: Colors.grey),
           ),
           const SizedBox(width: 8),
-          IconButton(
-            icon: const Icon(Icons.more_horiz),
-            iconSize: 20,
-            color: Theme.of(context).textTheme.bodySmall?.color,
-            onPressed: () => _showOptions(context),
-          ),
         ],
-      );
-    }
-
-    return IconButton(
-      icon: const Icon(Icons.more_horiz),
-      iconSize: 20,
-      color: Theme.of(context).textTheme.bodySmall?.color,
-      onPressed: () => _showOptions(context),
+        IconButton(
+          icon: const Icon(Icons.more_horiz),
+          iconSize: 20,
+          color: Theme.of(context).textTheme.bodySmall?.color,
+          onPressed: () => _showOptions(context),
+        ),
+      ],
     );
   }
 

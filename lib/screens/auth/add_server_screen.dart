@@ -44,17 +44,11 @@ class _AddServerScreenState extends State<AddServerScreen> {
 
   bool _isConnecting = false;
   String? _errorMessage;
-  late Future<bool> _hasYoutubeFuture;
 
   @override
   void initState() {
     super.initState();
-    final isIos = !kIsWeb && Platform.isIOS;
-    _selectedFamily = (isIos && widget.initialFamily == 'youtube')
-        ? 'subsonic'
-        : (widget.initialFamily ?? 'subsonic');
-    _hasYoutubeFuture =
-        Provider.of<AuthProvider>(context, listen: false).hasYoutubeProfile();
+    _selectedFamily = widget.initialFamily ?? 'subsonic';
   }
 
   @override
@@ -118,73 +112,6 @@ class _AddServerScreenState extends State<AddServerScreen> {
       return false;
     }
     return true;
-  }
-
-  Future<void> _connectYtStream() async {
-    if (!kIsWeb && Platform.isIOS) {
-      setState(() {
-        _errorMessage = 'Web Stream is not available on iOS.';
-      });
-      return;
-    }
-
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
-    final playerProvider = Provider.of<PlayerProvider>(context, listen: false);
-    final libraryProvider =
-        Provider.of<LibraryProvider>(context, listen: false);
-
-    final hasYt = await authProvider.hasYoutubeProfile();
-    if (hasYt) {
-      setState(() {
-        _errorMessage =
-            'Web Stream is already configured in your music sources.';
-      });
-      return;
-    }
-
-    setState(() {
-      _isConnecting = true;
-      _errorMessage = null;
-    });
-
-    try {
-      await playerProvider.stop();
-      final success = await authProvider.connectYtStream();
-      if (success) {
-        await libraryProvider.refresh();
-        if (!mounted) return;
-        final l10n = AppLocalizations.of(context)!;
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                const Icon(CupertinoIcons.checkmark_circle_fill,
-                    color: Color(0xFF34C759), size: 18),
-                const SizedBox(width: 10),
-                Text(l10n.connectedToWebStream,
-                    style: const TextStyle(fontWeight: FontWeight.w500)),
-              ],
-            ),
-            duration: const Duration(seconds: 2),
-            behavior: SnackBarBehavior.floating,
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        );
-      } else {
-        setState(() {
-          _isConnecting = false;
-          _errorMessage =
-              authProvider.error ?? 'Failed to connect to Web Stream';
-        });
-      }
-    } catch (e) {
-      setState(() {
-        _isConnecting = false;
-        _errorMessage = e.toString();
-      });
-    }
   }
 
   Future<void> _connectServer() async {
@@ -301,95 +228,71 @@ class _AddServerScreenState extends State<AddServerScreen> {
         ),
         centerTitle: true,
       ),
-      body: FutureBuilder<bool>(
-        future: _hasYoutubeFuture,
-        builder: (context, snapshot) {
-          final hasYtStream = snapshot.data ?? false;
-
-          return SingleChildScrollView(
-            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Select Music Provider',
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: isDark
-                        ? AppTheme.darkSecondaryText
-                        : AppTheme.lightSecondaryText,
-                    letterSpacing: 0.5,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                _buildProviderCard(
-                  family: 'subsonic',
-                  title: 'Navidrome / Subsonic',
-                  subtitle: 'Connect to your self-hosted music library',
-                  icon: CupertinoIcons.music_note_2,
-                  gradient: const [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                  badge: 'Self-Hosted',
-                  isSelected: _selectedFamily == 'subsonic',
-                  isDisabled: false,
-                ),
-                const SizedBox(height: 10),
-                _buildProviderCard(
-                  family: 'jellyfin',
-                  title: 'Jellyfin / Emby',
-                  subtitle: 'Connect to your Jellyfin or Emby media server',
-                  icon: CupertinoIcons.tv_fill,
-                  gradient: const [Color(0xFF00A4DC), Color(0xFF006699)],
-                  badge: 'Media Server',
-                  isSelected: _selectedFamily == 'jellyfin',
-                  isDisabled: false,
-                ),
-                if (!kIsWeb && !Platform.isIOS && !isTv) ...[
-                  const SizedBox(height: 10),
-                  _buildProviderCard(
-                    family: 'youtube',
-                    title: 'Web Stream',
-                    subtitle: hasYtStream
-                        ? 'Already configured in your music sources'
-                        : 'Stream music online without account setup',
-                    icon: CupertinoIcons.play_rectangle_fill,
-                    gradient: const [Color(0xFFFF3B30), Color(0xFFFF453A)],
-                    badge: hasYtStream ? 'ALREADY ADDED' : 'No Account Needed',
-                    isSelected: _selectedFamily == 'youtube',
-                    isDisabled: hasYtStream,
-                  ),
-                ],
-                if (!isTv) ...[
-                  const SizedBox(height: 10),
-                  _buildProviderCard(
-                    family: 'local',
-                    title: 'Local Files',
-                    subtitle: 'Play audio files stored directly on this device',
-                    icon: CupertinoIcons.folder_fill,
-                    gradient: const [Color(0xFF34C759), Color(0xFF30B0C7)],
-                    badge: 'Offline',
-                    isSelected: _selectedFamily == 'local',
-                    isDisabled: false,
-                  ),
-                ],
-                const SizedBox(height: 24),
-                if (_errorMessage != null) ...[
-                  _buildErrorBanner(isDark),
-                  const SizedBox(height: 16),
-                ],
-                if (_selectedFamily == 'youtube') ...[
-                  _buildYtStreamInfoCard(isDark, hasYtStream),
-                ] else if (_selectedFamily == 'local') ...[
-                  _buildLocalFilesCard(isDark),
-                ] else ...[
-                  _buildServerForm(isDark),
-                ],
-                const SizedBox(height: 32),
-              ],
+      body: SingleChildScrollView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Select Music Provider',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: isDark
+                    ? AppTheme.darkSecondaryText
+                    : AppTheme.lightSecondaryText,
+                letterSpacing: 0.5,
+              ),
             ),
-          );
-        },
+            const SizedBox(height: 12),
+            _buildProviderCard(
+              family: 'subsonic',
+              title: 'Navidrome / Subsonic',
+              subtitle: 'Connect to your self-hosted music library',
+              icon: CupertinoIcons.music_note_2,
+              gradient: const [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+              badge: 'Self-Hosted',
+              isSelected: _selectedFamily == 'subsonic',
+              isDisabled: false,
+            ),
+            const SizedBox(height: 10),
+            _buildProviderCard(
+              family: 'jellyfin',
+              title: 'Jellyfin / Emby',
+              subtitle: 'Connect to your Jellyfin or Emby media server',
+              icon: CupertinoIcons.tv_fill,
+              gradient: const [Color(0xFF00A4DC), Color(0xFF006699)],
+              badge: 'Media Server',
+              isSelected: _selectedFamily == 'jellyfin',
+              isDisabled: false,
+            ),
+            if (!isTv) ...[
+              const SizedBox(height: 10),
+              _buildProviderCard(
+                family: 'local',
+                title: 'Local Files',
+                subtitle: 'Play audio files stored directly on this device',
+                icon: CupertinoIcons.folder_fill,
+                gradient: const [Color(0xFF34C759), Color(0xFF30B0C7)],
+                badge: 'Offline',
+                isSelected: _selectedFamily == 'local',
+                isDisabled: false,
+              ),
+            ],
+            const SizedBox(height: 24),
+            if (_errorMessage != null) ...[
+              _buildErrorBanner(isDark),
+              const SizedBox(height: 16),
+            ],
+            if (_selectedFamily == 'local') ...[
+              _buildLocalFilesCard(isDark),
+            ] else ...[
+              _buildServerForm(isDark),
+            ],
+            const SizedBox(height: 32),
+          ],
+        ),
       ),
     );
   }
@@ -568,145 +471,6 @@ class _AddServerScreenState extends State<AddServerScreen> {
     );
   }
 
-  Widget _buildYtStreamInfoCard(bool isDark, bool hasYtStream) {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkSurface : Colors.white,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: isDark ? Colors.white10 : Colors.black.withValues(alpha: 0.06),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFF3B30).withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(CupertinoIcons.sparkles,
-                    color: Color(0xFFFF3B30), size: 18),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Zero-Config Streaming',
-                      style:
-                          TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                    ),
-                    Text(
-                      'No server setup or account credentials required',
-                      style: TextStyle(fontSize: 12, color: Colors.grey),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          const Divider(height: 1),
-          const SizedBox(height: 16),
-          _buildFeatureBullet(
-            icon: CupertinoIcons.music_albums,
-            title: 'Global Music Search',
-            subtitle:
-                'Search and stream millions of tracks, albums, and playlists seamlessly.',
-            isDark: isDark,
-          ),
-          const SizedBox(height: 12),
-          _buildFeatureBullet(
-            icon: CupertinoIcons.antenna_radiowaves_left_right,
-            title: 'Dynamic Radio',
-            subtitle:
-                'Auto-generates seamless radio stations tailored to any song or artist.',
-            isDark: isDark,
-          ),
-          const SizedBox(height: 12),
-          _buildFeatureBullet(
-            icon: CupertinoIcons.lock_shield,
-            title: 'Private & Direct',
-            subtitle:
-                'Audio streams directly to your device with local smart caching.',
-            isDark: isDark,
-          ),
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: FilledButton(
-              onPressed: hasYtStream || _isConnecting ? null : _connectYtStream,
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFFFF3B30),
-                disabledBackgroundColor: hasYtStream
-                    ? const Color(0xFF34C759).withValues(alpha: 0.3)
-                    : Colors.grey.withValues(alpha: 0.3),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14)),
-              ),
-              child: _isConnecting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                          color: Colors.white, strokeWidth: 2.5),
-                    )
-                  : Text(
-                      hasYtStream
-                          ? 'Web Stream is Already Added'
-                          : 'Connect Web Stream',
-                      style: const TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.bold),
-                    ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFeatureBullet({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required bool isDark,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 18, color: const Color(0xFFFF3B30)),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title,
-                  style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w600)),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: isDark
-                      ? AppTheme.darkSecondaryText
-                      : AppTheme.lightSecondaryText,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _buildLocalFilesCard(bool isDark) {
     return Container(

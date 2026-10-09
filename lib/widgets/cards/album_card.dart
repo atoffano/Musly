@@ -11,6 +11,7 @@ class AlbumCard extends StatefulWidget {
   final double size;
   final VoidCallback? onTap;
   final VoidCallback? onPlayPressed;
+  final VoidCallback? onLongPress;
 
   const AlbumCard({
     super.key,
@@ -18,6 +19,7 @@ class AlbumCard extends StatefulWidget {
     this.size = 160,
     this.onTap,
     this.onPlayPressed,
+    this.onLongPress,
   });
 
   @override
@@ -38,6 +40,7 @@ class _AlbumCardState extends State<AlbumCard> {
         onExit: (_) => setState(() => _isHovered = false),
         child: GestureDetector(
           onTap: widget.onTap,
+          onLongPress: widget.onLongPress,
           child: SizedBox(
             width: widget.size,
             child: Column(

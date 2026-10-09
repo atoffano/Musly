@@ -133,6 +133,40 @@ class _SongOptionsModalState extends State<SongOptionsModal> {
                         }
                       },
                     ),
+                    if (_canToggleLibrarySaved(widget.song))
+                      Selector<PlayerProvider, ({bool saved, bool busy})>(
+                        selector: (_, provider) => (
+                          saved: provider.isYouTubeSaved(widget.song),
+                          busy: provider.isYouTubeSaveBusy(widget.song),
+                        ),
+                        builder: (context, state, _) {
+                          return _OptionTile(
+                            icon: state.saved
+                                ? Icons.check_circle_rounded
+                                : Icons.add_circle_outline_rounded,
+                            title: state.saved
+                                ? 'Remove from Library'
+                                : 'Add to Library',
+                            iconColor:
+                                state.saved ? const Color(0xFF1DB954) : null,
+                            enabled: !state.busy,
+                            trailing: state.busy
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2),
+                                  )
+                                : null,
+                            onTap: () async {
+                              await _toggleYouTubeSaved(context);
+                              if (context.mounted) {
+                                Navigator.pop(context);
+                              }
+                            },
+                          );
+                        },
+                      ),
                     _OptionTile(
                       icon: Icons.play_arrow_rounded,
                       title: 'Play Next',
@@ -229,6 +263,15 @@ class _SongOptionsModalState extends State<SongOptionsModal> {
                     ),
                     _buildRatingTile(context),
                     _buildDownloadTile(context),
+                    _OptionTile(
+                      icon: CupertinoIcons.trash,
+                      title: 'Remove Song',
+                      iconColor: Colors.red,
+                      onTap: () async {
+                        Navigator.pop(context);
+                        await _removeSong(context);
+                      },
+                    ),
                     const SizedBox(height: 16),
                   ],
                 ),
@@ -238,6 +281,69 @@ class _SongOptionsModalState extends State<SongOptionsModal> {
         ),
       ),
     );
+  }
+
+  bool _canToggleLibrarySaved(Song song) {
+    return song.isYouTube ||
+        (song.sourceId != null && song.sourceId!.isNotEmpty) ||
+        song.id.startsWith('yt:');
+  }
+
+  Future<void> _toggleYouTubeSaved(BuildContext context) async {
+    final playerProvider = Provider.of<PlayerProvider>(context, listen: false);
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      await playerProvider.toggleYouTubeSaved(widget.song);
+      if (!mounted) return;
+      final nowSaved = playerProvider.isYouTubeSaved(widget.song);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(
+            nowSaved ? 'Saving to library started' : 'Removed from library',
+          ),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Save action failed: $e'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _removeSong(BuildContext context) async {
+    final playerProvider = Provider.of<PlayerProvider>(context, listen: false);
+    final libraryProvider =
+        Provider.of<LibraryProvider>(context, listen: false);
+    final messenger = ScaffoldMessenger.of(context);
+
+    try {
+      if (_canToggleLibrarySaved(widget.song)) {
+        await playerProvider.removeYouTubeSaved(widget.song);
+      } else {
+        await libraryProvider.deleteSong(widget.song.id);
+      }
+      if (!mounted) return;
+      messenger.showSnackBar(
+        const SnackBar(
+          content: Text('Song removed from library'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Failed to remove song: $e'),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   Widget _buildDownloadTile(BuildContext context) {
@@ -783,23 +889,29 @@ class _OptionTile extends StatelessWidget {
   final String title;
   final VoidCallback onTap;
   final Color? iconColor;
+  final bool enabled;
+  final Widget? trailing;
 
   const _OptionTile({
     required this.icon,
     required this.title,
     required this.onTap,
     this.iconColor,
+    this.enabled = true,
+    this.trailing,
   });
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
+      enabled: enabled,
       leading: Icon(
         icon,
         color: iconColor ?? Theme.of(context).colorScheme.primary,
       ),
       title: Text(title),
-      onTap: onTap,
+      trailing: trailing,
+      onTap: enabled ? onTap : null,
     );
   }
 }

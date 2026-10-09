@@ -316,6 +316,9 @@ void main() async {
           value: tvDetectionService),
       ChangeNotifierProvider<PlayerProvider>.value(value: playerProvider),
       ChangeNotifierProvider<LibraryProvider>.value(value: libraryProvider),
+      ChangeNotifierProvider<RecommendationsProvider>(
+        create: (_) => RecommendationsProvider(),
+      ),
     ],
     child: const MuslyApp(),
   );

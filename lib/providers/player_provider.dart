@@ -19,7 +19,7 @@ import '../services/windows_system_service.dart';
 import '../services/recommendation_service.dart';
 import '../services/replay_gain_service.dart';
 import '../services/auto_dj_service.dart';
-import '../services/ytdlp_service.dart';
+import '../services/musly_backend_service.dart';
 import '../services/lrclib_service.dart';
 import '../services/discord_rpc_service.dart';
 import '../services/storage_service.dart';
@@ -39,8 +39,11 @@ import '../services/android_auto_service.dart';
 
 enum RepeatMode { off, all, one }
 
+enum YouTubeSaveState { idle, saving, polling, ready, error }
+
 class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implements AndroidAutoDelegate {
   final SubsonicService _subsonicService;
+  final MuslyBackendService _muslyBackendService;
   late final StorageService _storageService;
   final MuslyAudioHandler _audioHandler;
 
@@ -70,6 +73,13 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
   Song? _currentSong;
   double _volume = 1.0;
   double _lastNonZeroVolume = 1.0;
+  bool _hasScrobbledCurrentSong = false;
+
+  final Map<String, bool> _youtubeSavedOverrides = {};
+  final Map<String, YouTubeSaveState> _youtubeSaveStates = {};
+  final Map<String, String> _youtubeSaveErrors = {};
+  final Set<String> _youtubeSaveLocks = {};
+  final Map<String, Timer> _youtubePollingTimers = {};
 
   /// True when audio renders on another device rather than this phone.
   ///
@@ -157,8 +167,9 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
     this._upnpService,
     this._audioHandler,
     this._jukeboxService,
-    this._transcodingService,
-  ) {
+    this._transcodingService, {
+    MuslyBackendService? muslyBackendService,
+  }) : _muslyBackendService = muslyBackendService ?? MuslyBackendService() {
     _storageService = storageService;
     _discordRpcService = DiscordRpcService(storageService);
     _castService.addListener(_onCastStateChanged);
@@ -423,11 +434,21 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
 
   String? _resolveInitialArtworkUrl(Song? song) {
     if (song == null) return null;
+    if (song.coverArt != null &&
+        (song.coverArt!.startsWith('http://') ||
+            song.coverArt!.startsWith('https://'))) {
+      return song.coverArt;
+    }
     if (song.isLocal) {
       return Uri.file(song.coverArt ?? song.path ?? '').toString();
     }
     if (_resolvedArtworkUrl != null && _currentSong?.id == song.id) {
       return _resolvedArtworkUrl;
+    }
+    final sourceId = song.sourceId ??
+        (song.id.startsWith('yt:') ? song.id.substring(3) : null);
+    if (sourceId != null && sourceId.isNotEmpty) {
+      return 'https://i.ytimg.com/vi/$sourceId/hqdefault.jpg';
     }
     if (song.coverArt != null && song.coverArt!.isNotEmpty) {
       if (song.coverArt!.startsWith('/') ||
@@ -437,6 +458,30 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
       return _subsonicService.getCoverArtUrl(song.coverArt, size: 800);
     }
     return _subsonicService.getCoverArtUrl(song.id, size: 800);
+  }
+
+  String? _resolveSongArtworkUrl(Song song, {int size = 300}) {
+    final coverArt = song.coverArt;
+    if (coverArt != null && coverArt.isNotEmpty) {
+      if (coverArt.startsWith('http://') || coverArt.startsWith('https://')) {
+        return coverArt;
+      }
+      if (song.isLocal) {
+        return coverArt;
+      }
+      return _subsonicService.getCoverArtUrl(coverArt, size: size);
+    }
+
+    final sourceId = song.sourceId ??
+        (song.id.startsWith('yt:') ? song.id.substring(3) : null);
+    if (sourceId != null && sourceId.isNotEmpty) {
+      return 'https://i.ytimg.com/vi/$sourceId/hqdefault.jpg';
+    }
+
+    if (!song.isLocal && song.id.isNotEmpty) {
+      return _subsonicService.getCoverArtUrl(song.id, size: size);
+    }
+    return null;
   }
 
   String? _resolveArtworkUrl() {
@@ -455,6 +500,16 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
     final song = _currentSong;
     if (song == null) {
       _resolvedArtworkUrl = null;
+      return;
+    }
+    if (song.coverArt != null &&
+        (song.coverArt!.startsWith('http://') ||
+            song.coverArt!.startsWith('https://'))) {
+      _resolvedArtworkUrl = song.coverArt;
+      if (_currentSong?.id == song.id) {
+        _updateAndroidAuto();
+        _updateAllServices();
+      }
       return;
     }
     if (song.isLocal) {
@@ -616,6 +671,175 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
   RadioStation? get currentRadioStation => _currentRadioStation;
   bool get isPlayingRadio => _isPlayingRadio;
 
+  bool isYouTubeSaveBusy(Song song) {
+    final key = _youtubeKey(song);
+    if (key == null) {
+      return false;
+    }
+    return _youtubeSaveLocks.contains(key);
+  }
+
+  bool isYouTubeSaved(Song song) {
+    final key = _youtubeKey(song);
+    if (key == null) {
+      return song.saved;
+    }
+
+    if (_youtubeSavedOverrides.containsKey(key)) {
+      return _youtubeSavedOverrides[key]!;
+    }
+
+    if (_libraryProvider != null && _libraryProvider!.isYouTubeSavedInLibraryByKey(key)) {
+      return true;
+    }
+
+    return song.saved;
+  }
+
+  YouTubeSaveState youtubeSaveState(Song song) {
+    final key = _youtubeKey(song);
+    if (key == null) {
+      return YouTubeSaveState.idle;
+    }
+    return _youtubeSaveStates[key] ?? YouTubeSaveState.idle;
+  }
+
+  String? youtubeSaveError(Song song) {
+    final key = _youtubeKey(song);
+    if (key == null) {
+      return null;
+    }
+    return _youtubeSaveErrors[key];
+  }
+
+  Future<void> toggleYouTubeSaved(Song song) async {
+    final bridgeUrl = _bridgeBaseUrl();
+    if (bridgeUrl == null) {
+      throw Exception('Bridge URL unavailable for YouTube save action');
+    }
+
+    final key = _youtubeKey(song);
+    if (key == null || key.isEmpty) {
+      throw Exception('Missing YouTube source id');
+    }
+
+    if (_youtubeSaveLocks.contains(key)) {
+      return;
+    }
+
+    _youtubeSaveLocks.add(key);
+    _youtubeSaveErrors.remove(key);
+
+    final wasSaved = _youtubeSavedOverrides[key] ?? song.saved;
+    final targetSaved = !wasSaved;
+    _youtubeSavedOverrides[key] = targetSaved;
+    _youtubeSaveStates[key] = YouTubeSaveState.saving;
+    _syncCurrentSongYoutubeState(song, targetSaved);
+    notifyListeners();
+
+    try {
+      if (targetSaved) {
+        final result = await _muslyBackendService.saveSong(
+          bridgeUrl,
+          videoId: key,
+          title: song.title,
+          artist: song.artist,
+          album: song.album,
+        );
+        _youtubeSaveStates[key] = YouTubeSaveState.polling;
+        notifyListeners();
+        _startYouTubeSavePolling(song, key, result.jobId, targetSaved, wasSaved);
+      } else {
+        final songIdFallback =
+            song.id.isNotEmpty && !song.id.startsWith('yt:') ? song.id : null;
+        var removed = await _muslyBackendService.deleteSong(bridgeUrl, key);
+        if (!removed && songIdFallback != null) {
+          removed = await _muslyBackendService.deleteSong(
+            bridgeUrl,
+            '',
+            songId: songIdFallback,
+          );
+        }
+        if (!removed) {
+          throw Exception('Song is not currently saved in the bridge state');
+        }
+        await _libraryProvider?.refreshAllSongsCache();
+        _youtubeSaveStates[key] = YouTubeSaveState.ready;
+        _youtubeSavedOverrides[key] = false;
+        _libraryProvider?.updateYouTubeSavedState(key, false);
+        _finishYouTubeSaveAction(key);
+      }
+    } catch (e) {
+      _youtubeSavedOverrides[key] = wasSaved;
+      _syncCurrentSongYoutubeState(song, wasSaved);
+      _youtubeSaveStates[key] = YouTubeSaveState.error;
+      _youtubeSaveErrors[key] = e.toString();
+      _youtubeSaveLocks.remove(key);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
+  Future<void> removeYouTubeSaved(Song song) async {
+    final bridgeUrl = _bridgeBaseUrl();
+    if (bridgeUrl == null) {
+      throw Exception('Bridge URL unavailable for remove action');
+    }
+
+    final key = _youtubeKey(song);
+    final deleteKey = key ?? '';
+    final songIdFallback =
+        song.id.isNotEmpty && !song.id.startsWith('yt:') ? song.id : null;
+
+    if ((deleteKey.isEmpty) && (songIdFallback == null || songIdFallback.isEmpty)) {
+      throw Exception('Missing source id for remove action');
+    }
+
+    final lockKey = key ?? 'song:${song.id}';
+
+    if (_youtubeSaveLocks.contains(lockKey)) {
+      return;
+    }
+
+    _youtubeSaveLocks.add(lockKey);
+    _youtubeSaveErrors.remove(lockKey);
+    _youtubeSaveStates[lockKey] = YouTubeSaveState.saving;
+    notifyListeners();
+
+    try {
+      var removed = await _muslyBackendService.deleteSong(
+        bridgeUrl,
+        deleteKey,
+        songId: deleteKey.isEmpty ? songIdFallback : null,
+      );
+      if (!removed && deleteKey.isNotEmpty && songIdFallback != null) {
+        removed = await _muslyBackendService.deleteSong(
+          bridgeUrl,
+          '',
+          songId: songIdFallback,
+        );
+      }
+      if (!removed) {
+        throw Exception('Song is not currently saved in the bridge state');
+      }
+
+      await _libraryProvider?.refreshAllSongsCache();
+      _youtubeSaveStates[lockKey] = YouTubeSaveState.ready;
+      if (key != null && key.isNotEmpty) {
+        _youtubeSavedOverrides[key] = false;
+        _libraryProvider?.updateYouTubeSavedState(key, false);
+      }
+      _syncCurrentSongYoutubeState(song, false);
+      _finishYouTubeSaveAction(lockKey);
+    } catch (e) {
+      _youtubeSaveStates[lockKey] = YouTubeSaveState.error;
+      _youtubeSaveErrors[lockKey] = e.toString();
+      _youtubeSaveLocks.remove(lockKey);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   final _positionController = StreamController<Duration>.broadcast();
   Stream<Duration> get positionStream => _positionController.stream;
 
@@ -680,15 +904,12 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
     );
 
     if (nextSong.isLocal != true) {
-      final cleanId = nextSong.id.replaceFirst('ytmusic://', '');
-      if (_subsonicService.isYoutube ||
-          nextSong.id.startsWith('ytmusic://') ||
-          nextSong.id.length == 11) {
+      if (nextSong.isYouTube) {
         unawaited(
-          YtDlpService().resolveStreamInfo(cleanId).catchError((e) {
+          _resolvePlayableUrl(nextSong).catchError((e) {
             debugPrint(
-                '[Player Preload] YtDlp pre-resolve error (harmless): $e');
-            return YtStreamInfo(url: '', headers: {});
+                '[Player Preload] Bridge pre-resolve error (harmless): $e');
+            return '';
           }),
         );
       } else {
@@ -985,6 +1206,18 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
                 1000) {
           lastSystemUpdate = position;
           _updateAllServices();
+        }
+
+        if (!_hasScrobbledCurrentSong &&
+            _currentSong != null &&
+            _duration.inSeconds > 30) {
+          final totalSec = _duration.inSeconds;
+          final currentSec = position.inSeconds;
+          final threshold = (totalSec / 2).clamp(15, 240);
+          if (currentSec >= threshold) {
+            _hasScrobbledCurrentSong = true;
+            _performScrobble(_currentSong!, submission: true);
+          }
         }
       },
       onError: (error) {
@@ -1413,13 +1646,8 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
         _castWasPlaying = false;
         if (_audioPlayer.playing) await _audioPlayer.stop();
 
-        final playUrl = song.isLocal == true && song.path != null
-            ? Uri.file(song.path!).toString()
-            : await _subsonicService.resolveStreamUrlAsync(song);
-        final coverUrl = song.isLocal == true && song.coverArt != null
-            ? song.coverArt!
-            : _subsonicService.getCoverArtUrl(song.coverArt ?? song.id,
-                size: 800);
+        final playUrl = await _resolvePlayableUrl(song);
+        final coverUrl = _resolveSongArtworkUrl(song, size: 800) ?? '';
         final mimeType =
             song.contentType ?? UpnpService.mimeTypeFromSuffix(song.suffix);
 
@@ -1437,17 +1665,8 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
           autoPlay: true,
         );
 
-        if (song.isLocal != true) {
-          if (_offlineService.isOfflineMode) {
-            _offlineService.queueScrobble(song.id, submission: false);
-          } else {
-            _subsonicService
-                .scrobble(song.id, submission: false)
-                .catchError((e) {
-              _offlineService.queueScrobble(song.id, submission: false);
-            });
-          }
-        }
+        _hasScrobbledCurrentSong = false;
+        _performScrobble(song, submission: false);
 
         _isPlaying = success;
         _isLoading = false;
@@ -1467,7 +1686,7 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
         bool superseded() {
           if (switchGeneration == _remoteSwitchGeneration) return false;
           debugPrint('UPnP: switch #$switchGeneration superseded by '
-              '#$_remoteSwitchGeneration â€” abandoning "${song.title}"');
+              '#$_remoteSwitchGeneration — abandoning "${song.title}"');
           return true;
         }
 
@@ -1478,9 +1697,7 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
         if (_audioPlayer.playing) await _audioPlayer.stop();
         if (superseded()) return;
 
-        final playUrl = song.isLocal == true && song.path != null
-            ? Uri.file(song.path!).toString()
-            : await _subsonicService.resolveStreamUrlAsync(song);
+        final playUrl = await _resolvePlayableUrl(song);
         if (superseded()) return;
 
         try {
@@ -1491,9 +1708,7 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
             title: song.title,
             artist: song.artist ?? 'Unknown Artist',
             album: song.album,
-            albumArtUrl: song.coverArt != null
-                ? _subsonicService.getCoverArtUrl(song.coverArt, size: 800)
-                : null,
+            albumArtUrl: _resolveSongArtworkUrl(song, size: 800),
             durationSecs: song.duration,
             contentType: mimeType,
           );
@@ -1531,29 +1746,9 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
         }
         return;
       } else {
-
-        final youtubeSource = song.isLocal != true
-            ? await _subsonicService.getYoutubeAudioSource(song)
-            : null;
-
-        if (youtubeSource != null) {
+        if (song.isYouTube) {
           _concatenatingSource = null;
-          await _audioPlayer.setAudioSource(youtubeSource);
-          _applyReplayGain(song).catchError((_) {});
-          await _ensureAudioFocus(() => _audioPlayer.play());
-        } else if (_subsonicService.isYoutube) {
-          _concatenatingSource = null;
-          final String playUrl;
-          if (song.isLocal == true && song.path != null) {
-            playUrl = Uri.file(song.path!).toString();
-          } else {
-            final offlinePath = _offlineService.getLocalPath(song.id);
-            if (offlinePath != null) {
-              playUrl = 'file://$offlinePath';
-            } else {
-              playUrl = await _subsonicService.resolveStreamUrlAsync(song);
-            }
-          }
+          final playUrl = await _resolvePlayableUrl(song);
           await _audioPlayer.setUrl(playUrl);
           _applyReplayGain(song).catchError((_) {});
           await _ensureAudioFocus(() => _audioPlayer.play());
@@ -1621,21 +1816,8 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
         }
       }
 
-      if (song.isLocal != true) {
-        if (_offlineService.isOfflineMode) {
-          _offlineService.queueScrobble(song.id, submission: false);
-        } else {
-          _subsonicService.scrobble(song.id, submission: false).catchError((e) {
-            _offlineService.queueScrobble(song.id, submission: false);
-          });
-
-          _offlineService
-              .flushPendingScrobbles(_subsonicService)
-              .catchError((e) {
-            debugPrint('Scrobble flush failed: $e');
-          });
-        }
-      }
+      _hasScrobbledCurrentSong = false;
+      _performScrobble(song, submission: false);
 
       if (_recommendationService != null) {
         _recommendationService!.trackSongPlay(
@@ -1654,6 +1836,143 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
     } finally {
       _isLoading = false;
       notifyListeners();
+    }
+  }
+
+  Future<String> _resolvePlayableUrl(Song song) async {
+    if (song.isLocal == true && song.path != null) {
+      return Uri.file(song.path!).toString();
+    }
+
+    if (song.isYouTube) {
+      final sourceId = song.sourceId ?? (song.id.startsWith('yt:') ? song.id.substring(3) : null);
+      if (sourceId == null || sourceId.isEmpty) {
+        throw Exception('Missing YouTube source id for playback');
+      }
+
+      if (song.streamUrl != null && song.streamUrl!.isNotEmpty) {
+        return song.streamUrl!;
+      }
+
+      final bridgeUrl = _bridgeBaseUrl();
+      if (bridgeUrl == null) {
+        throw Exception('Bridge URL unavailable for YouTube playback');
+      }
+      return await _muslyBackendService.resolveStreamUrl(
+        bridgeUrl,
+        sourceId,
+        title: song.title,
+        artist: song.artist,
+        album: song.album,
+        duration: song.duration,
+      );
+    }
+
+    return _offlineService.getPlayableUrl(song, _subsonicService);
+  }
+
+  String? _bridgeBaseUrl() => _subsonicService.bridgeUrl;
+
+  String? _youtubeKey(Song song) {
+    final sourceId = song.sourceId ?? (song.id.startsWith('yt:') ? song.id.substring(3) : null);
+    if (sourceId == null || sourceId.isEmpty) {
+      return null;
+    }
+    return sourceId;
+  }
+
+  void _startYouTubeSavePolling(
+    Song song,
+    String key,
+    String jobId,
+    bool targetSaved,
+    bool rollbackSaved,
+  ) {
+    _youtubePollingTimers[key]?.cancel();
+    var attempts = 0;
+    const maxAttempts = 30;
+    final bridgeUrl = _bridgeBaseUrl();
+    if (bridgeUrl == null) {
+      _youtubeSavedOverrides[key] = rollbackSaved;
+      _syncCurrentSongYoutubeState(song, rollbackSaved);
+      _youtubeSaveStates[key] = YouTubeSaveState.error;
+      _youtubeSaveErrors[key] = 'Bridge URL unavailable while polling';
+      _youtubeSaveLocks.remove(key);
+      notifyListeners();
+      return;
+    }
+
+    _youtubePollingTimers[key] = Timer.periodic(const Duration(seconds: 1), (timer) async {
+      attempts += 1;
+      try {
+        final snapshot = await _muslyBackendService.getJobStatus(bridgeUrl, jobId);
+        final status = snapshot.status.toLowerCase();
+
+        if (status == 'ready') {
+          timer.cancel();
+          _youtubeSavedOverrides[key] = true;
+          _youtubeSaveStates[key] = YouTubeSaveState.ready;
+          _syncCurrentSongYoutubeState(song, true);
+          _libraryProvider?.updateYouTubeSavedState(key, true);
+          _libraryProvider?.refreshAllSongsCache();
+          _finishYouTubeSaveAction(key);
+          notifyListeners();
+          return;
+        }
+
+        if (status == 'failed') {
+          timer.cancel();
+          _youtubeSavedOverrides[key] = rollbackSaved;
+          _syncCurrentSongYoutubeState(song, rollbackSaved);
+          _youtubeSaveStates[key] = YouTubeSaveState.error;
+          _youtubeSaveErrors[key] = snapshot.errorMessage ?? 'Bridge save job failed';
+          _youtubeSaveLocks.remove(key);
+          notifyListeners();
+          return;
+        }
+
+        if (attempts >= maxAttempts) {
+          timer.cancel();
+          _youtubeSavedOverrides[key] = rollbackSaved;
+          _syncCurrentSongYoutubeState(song, rollbackSaved);
+          _youtubeSaveStates[key] = YouTubeSaveState.error;
+          _youtubeSaveErrors[key] = 'Save job timed out after 30 seconds';
+          _youtubeSaveLocks.remove(key);
+          notifyListeners();
+        }
+      } catch (e) {
+        if (attempts >= maxAttempts) {
+          timer.cancel();
+          _youtubeSavedOverrides[key] = rollbackSaved;
+          _syncCurrentSongYoutubeState(song, rollbackSaved);
+          _youtubeSaveStates[key] = YouTubeSaveState.error;
+          _youtubeSaveErrors[key] = e.toString();
+          _youtubeSaveLocks.remove(key);
+          notifyListeners();
+        }
+      }
+    });
+  }
+
+  void _finishYouTubeSaveAction(String key) {
+    _youtubePollingTimers.remove(key)?.cancel();
+    _youtubeSaveLocks.remove(key);
+    notifyListeners();
+  }
+
+  void _syncCurrentSongYoutubeState(Song sourceSong, bool saved) {
+    final current = _currentSong;
+    if (current == null) {
+      return;
+    }
+    final currentKey = _youtubeKey(current);
+    final sourceKey = _youtubeKey(sourceSong);
+    if (currentKey != null && sourceKey != null && currentKey == sourceKey) {
+      _currentSong = current.copyWith(saved: saved);
+      return;
+    }
+    if (current.id == sourceSong.id) {
+      _currentSong = current.copyWith(saved: saved);
     }
   }
 
@@ -2014,19 +2333,6 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
       await _checkAndRefillAutoQueue();
       if (_currentIndex < _queue.length - 1) {
         await skipToIndex(_currentIndex + 1);
-      }
-    } else if (_subsonicService.isYoutube && _currentSong != null) {
-      final moreSimilar =
-          await _subsonicService.getSimilarSongs(_currentSong!.id, count: 20);
-      final existingIds = _queue.map((s) => s.id).toSet();
-      final toAdd =
-          moreSimilar.where((s) => !existingIds.contains(s.id)).toList();
-      if (toAdd.isNotEmpty) {
-        _queue.addAll(toAdd);
-        notifyListeners();
-        _saveQueueState();
-        await skipToIndex(_currentIndex + 1);
-      }
     } else if (_repeatMode == RepeatMode.all) {
       if (_queue.length == 1) {
         await seek(Duration.zero);
@@ -2419,9 +2725,12 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
     if (offlinePath != null) {
       return AudioSource.uri(Uri.file(offlinePath));
     }
-    if (_subsonicService.isYoutube) {
-      final ytSource = await _subsonicService.getYoutubeAudioSource(song);
-      if (ytSource != null) return ytSource;
+    if (song.isYouTube) {
+      final playUrl = await _resolvePlayableUrl(song);
+      return AudioSource.uri(
+        Uri.parse(playUrl),
+        tag: song.id,
+      );
     }
 
     final maxBitRate =
@@ -2465,16 +2774,18 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
 
     if (_jukeboxService.enabled) return;
     try {
-      if (_subsonicService.isYoutube && _currentSong!.isLocal != true) {
-        final ytSource =
-            await _subsonicService.getYoutubeAudioSource(_currentSong!);
-        if (ytSource != null) {
-          await _audioPlayer.setAudioSource(ytSource);
-          if (_position.inMilliseconds > 0) {
-            await _audioPlayer.seek(_position);
-          }
-          return;
+      if (_currentSong!.isYouTube) {
+        final playUrl = await _resolvePlayableUrl(_currentSong!);
+        await _audioPlayer.setAudioSource(
+          AudioSource.uri(
+            Uri.parse(playUrl),
+            tag: _currentSong!.id,
+          ),
+        );
+        if (_position.inMilliseconds > 0) {
+          await _audioPlayer.seek(_position);
         }
+        return;
       }
       if (_gaplessEnabled && _queue.isNotEmpty) {
         await _buildAndSetConcatenatingSource(initialIndex: _currentIndex);
@@ -2559,17 +2870,11 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
     final outgoing = _currentSong;
     if (outgoing == null) return;
 
-    if (outgoing.isLocal != true) {
-      if (_canScrobble(outgoing)) {
-        _subsonicService.scrobble(outgoing.id, submission: true).catchError(
-          (e) {
-            _offlineService.queueScrobble(outgoing.id, submission: true);
-          },
-        );
-      } else {
-        debugPrint('[Player] Skipped scrobble for "${outgoing.title}" '
-            '(not played long enough)');
-      }
+    if (_canScrobble(outgoing)) {
+      _performScrobble(outgoing, submission: true);
+    } else {
+      debugPrint('[Player] Skipped scrobble for "${outgoing.title}" '
+          '(not played long enough)');
     }
     if (_recommendationService != null) {
       _recommendationService!.trackSongPlay(
@@ -2577,6 +2882,43 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
         durationPlayed: _duration.inSeconds,
         completed: true,
       );
+    }
+  }
+
+  void _performScrobble(Song song, {required bool submission}) {
+    // 1. Subsonic (Navidrome) scrobble for library songs
+    if (song.isLocal != true && !song.isYouTube) {
+      if (_offlineService.isOfflineMode) {
+        _offlineService.queueScrobble(song.id, submission: submission);
+      } else {
+        _subsonicService.scrobble(song.id, submission: submission).catchError((e) {
+          _offlineService.queueScrobble(song.id, submission: submission);
+        });
+        if (!submission) {
+          _offlineService.flushPendingScrobbles(_subsonicService).catchError((e) {
+            debugPrint('Scrobble flush failed: $e');
+          });
+        }
+      }
+    }
+
+    // 2. Bridge (music-pipeline) scrobble for YouTube & local tracks
+    final bridge = _bridgeBaseUrl();
+    if (bridge != null) {
+      final sourceId = song.sourceId ??
+          (song.id.startsWith('yt:') ? song.id.substring(3) : null);
+      _muslyBackendService.scrobble(
+        bridge,
+        videoId: sourceId,
+        songId: song.isYouTube ? null : song.id,
+        title: song.title,
+        artist: song.artist,
+        album: song.album,
+        duration: song.duration,
+        submission: submission,
+      ).catchError((e) {
+        debugPrint('Bridge scrobble failed: $e');
+      });
     }
   }
 
@@ -2605,20 +2947,11 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
     _resolvedArtworkUrl = null;
 
     _resetScrobbleTracking(_currentSong!);
+    _hasScrobbledCurrentSong = false;
     notifyListeners();
     _saveQueueState();
 
-    if (_currentSong!.isLocal != true) {
-      if (_offlineService.isOfflineMode) {
-        _offlineService.queueScrobble(_currentSong!.id, submission: false);
-      } else {
-        _subsonicService
-            .scrobble(_currentSong!.id, submission: false)
-            .catchError((e) {
-          _offlineService.queueScrobble(_currentSong!.id, submission: false);
-        });
-      }
-    }
+    _performScrobble(_currentSong!, submission: false);
 
     await _refreshArtworkUrl();
     if (_currentSong != null) {

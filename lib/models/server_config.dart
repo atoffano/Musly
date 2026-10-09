@@ -168,6 +168,17 @@ class ServerConfig {
     return url;
   }
 
+  String? get bridgeUrl {
+    if (serverUrl.isEmpty) return null;
+    try {
+      final uri = Uri.parse(normalizedUrl);
+      if (uri.host.isEmpty) return null;
+      return '${uri.scheme}://${uri.host}:8788';
+    } catch (_) {
+      return null;
+    }
+  }
+
   bool get isValid {
     if (isYoutube || isLocal) {
       return serverUrl.isNotEmpty;

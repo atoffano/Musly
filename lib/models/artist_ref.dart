@@ -46,13 +46,40 @@ class ArtistRef {
     return parts.isEmpty ? [trimmed] : parts;
   }
 
+  /// Splits a composite artist string (e.g. "Artist A & Artist B", "A feat. B")
+  /// into individual ArtistRef items.
+  static List<ArtistRef> splitArtistString(String raw, [String? idFallback]) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return const [];
+
+    final regex = RegExp(
+      r'\s*(?:,\s*|\s+&\s+|\s+and\s+|\s+feat\.?\s+|\s+ft\.?\s+|\s+featuring\s+|\s+\/\s+|\s+vs\.?\s+|\s+[xX]\s+|\s+with\s+)\s*',
+      caseSensitive: false,
+    );
+
+    final parts = trimmed
+        .split(regex)
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .toList();
+
+    if (parts.length <= 1) {
+      return [ArtistRef(id: idFallback ?? '', name: trimmed)];
+    }
+
+    return parts.map((name) => ArtistRef(id: '', name: name)).toList();
+  }
+
   static List<ArtistRef>? parseList(dynamic data) {
     if (data == null || data is! List) return null;
 
     final parsedRefs = <ArtistRef>[];
     for (final item in data) {
-      if (item is Map<String, dynamic>) {
-        final ref = ArtistRef.fromJson(item);
+      final map = item is Map<String, dynamic>
+          ? item
+          : (item is Map ? Map<String, dynamic>.from(item) : null);
+      if (map != null) {
+        final ref = ArtistRef.fromJson(map);
         final splitNames = splitArtistNames(ref.name);
 
         if (splitNames.length > 1) {

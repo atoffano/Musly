@@ -13,6 +13,9 @@ import 'package:musly/theme/app_theme.dart';
 import 'package:musly/utils/navigation_helper.dart';
 import 'package:musly/screens/media/jukebox_screen.dart';
 import 'package:musly/screens/auth/add_server_screen.dart';
+import 'package:musly/screens/settings/spotify_migration_screen.dart';
+import 'package:musly/screens/settings/pipeline_logs_screen.dart';
+import 'package:musly/services/musly_backend_service.dart';
 import 'package:musly/widgets/settings/settings_section_card.dart';
 import 'package:musly/widgets/settings/settings_switch_tile.dart';
 import 'package:musly/widgets/settings/settings_list_tile.dart';
@@ -58,6 +61,8 @@ class _SettingsServerTabState extends State<SettingsServerTab> {
             children: [_buildJukeboxSection()],
           ),
         ],
+        const SizedBox(height: 24),
+        _buildMusicPipelineSection(context, currentConfig),
         const SizedBox(height: 24),
         SettingsSectionCard(
           title: l10n.sectionAccount,
@@ -601,6 +606,90 @@ class _SettingsServerTabState extends State<SettingsServerTab> {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildMusicPipelineSection(BuildContext context, ServerConfig? config) {
+    final bridgeUrl = config?.bridgeUrl;
+    return SettingsSectionCard(
+      title: 'Music Pipeline Bridge',
+      children: [
+        FutureBuilder<bool>(
+          future: bridgeUrl != null && bridgeUrl.isNotEmpty
+              ? MuslyBackendService().checkHealth(bridgeUrl)
+              : Future.value(false),
+          builder: (context, snapshot) {
+            final isOnline = snapshot.data == true;
+            final isChecking = snapshot.connectionState == ConnectionState.waiting;
+            return SettingsListTile(
+              gradientColors: const [Color(0xFF34C759), Color(0xFF30B0C7)],
+              icon: CupertinoIcons.waveform_path_ecg,
+              title: 'Bridge Status',
+              subtitle: bridgeUrl != null && bridgeUrl.isNotEmpty
+                  ? (isChecking
+                      ? 'Checking bridge connection...'
+                      : (isOnline ? 'Online ($bridgeUrl)' : 'Offline / Unreachable'))
+                  : 'No bridge configured',
+              trailing: isChecking
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: isOnline
+                                ? const Color(0xFF34C759)
+                                : const Color(0xFFFF3B30),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          isOnline ? 'Online' : 'Offline',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: isOnline
+                                ? const Color(0xFF34C759)
+                                : const Color(0xFFFF3B30),
+                          ),
+                        ),
+                      ],
+                    ),
+            );
+          },
+        ),
+        const SettingsDivider(),
+        SettingsListTile(
+          gradientColors: const [Color(0xFF1DB954), Color(0xFF1ED760)],
+          icon: CupertinoIcons.arrow_right_arrow_left_circle,
+          title: 'Import from Spotify',
+          subtitle: 'Import playlists, albums, and liked songs',
+          trailing: const Icon(CupertinoIcons.chevron_right, size: 16),
+          onTap: () => NavigationHelper.push(
+            context,
+            SpotifyMigrationScreen(bridgeUrl: bridgeUrl),
+          ),
+        ),
+        const SettingsDivider(),
+        SettingsListTile(
+          gradientColors: const [Color(0xFFFF9500), Color(0xFFFF6000)],
+          icon: CupertinoIcons.doc_text_search,
+          title: 'Pipeline Logs',
+          subtitle: 'View live ingestion and bridge logs',
+          trailing: const Icon(CupertinoIcons.chevron_right, size: 16),
+          onTap: () => NavigationHelper.push(
+            context,
+            PipelineLogsScreen(bridgeUrl: bridgeUrl),
+          ),
+        ),
+      ],
     );
   }
 

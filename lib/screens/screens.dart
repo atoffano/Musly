@@ -35,3 +35,7 @@ export 'settings/settings_server_tab.dart';
 export 'settings/settings_storage_tab.dart';
 export 'settings/settings_about_tab.dart';
 export 'settings/settings_support_tab.dart';
+export 'settings/spotify_migration_screen.dart';
+export 'settings/pipeline_logs_screen.dart';
+export 'detail/bridge_artist_screen.dart';
+export 'media/recommendations_screen.dart';

@@ -6,6 +6,8 @@ import '../../services/subsonic_service.dart';
 import '../../theme/app_theme.dart';
 import '../../utils/screen_helper.dart';
 import '../../widgets/widgets.dart';
+import '../../widgets/modals/playlist_options_sheet.dart';
+import '../../providers/library_provider.dart';
 import '../detail/album_screen.dart';
 
 enum AlbumCollectionType {
@@ -329,10 +331,74 @@ class _AlbumCollectionScreenState extends State<AlbumCollectionScreen> {
                   ),
                 );
               },
+              onLongPress: () => _showAlbumOptions(context, album),
             );
           },
           childCount: albums.length,
         ),
+      ),
+    );
+  }
+
+  void _showAlbumOptions(BuildContext context, Album album) {
+    showAlbumOptionsSheet(
+      context,
+      title: album.name,
+      onDelete: () {
+        Navigator.pop(context);
+        _showDeleteAlbumDialog(context, album);
+      },
+    );
+  }
+
+  void _showDeleteAlbumDialog(BuildContext context, Album album) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Album'),
+        content: Text(
+          'This will permanently delete the album "${album.name}" and its '
+          'songs from your library. The audio files will be deleted and '
+          'cannot be recovered.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final libraryProvider =
+                  Provider.of<LibraryProvider>(context, listen: false);
+              try {
+                final removed = await libraryProvider.deleteAlbum(album.id);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        'Album deleted - $removed songs removed from library',
+                      ),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to delete album: $e'),
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('Delete Album'),
+          ),
+        ],
       ),
     );
   }

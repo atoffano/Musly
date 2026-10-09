@@ -13,12 +13,14 @@ import '../widgets/common/album_artwork.dart';
 class LibraryProvider extends ChangeNotifier implements AndroidAutoLibraryDelegate {
   final SubsonicService _subsonicService;
   final MuslyAudioHandler _audioHandler;
+  final MuslyBackendService _muslyBackendService;
 
   bool _localOnlyMode = false;
   bool _serverOfflineMode = false;
   bool _mergeLocalLibrary = false;
   LocalMusicService? _localMusicService;
   final LibraryDatabaseService _db = LibraryDatabaseService();
+  final Set<String> _savedYouTubeKeys = {};
 
   List<Artist> _artists = [];
   List<Album> _recentAlbums = [];
@@ -44,7 +46,11 @@ class LibraryProvider extends ChangeNotifier implements AndroidAutoLibraryDelega
   static const String _artistsCacheKey = 'cached_artists';
   static const String _lastUpdateKey = 'last_cache_update';
 
-  LibraryProvider(this._subsonicService, this._audioHandler);
+  LibraryProvider(
+    this._subsonicService,
+    this._audioHandler, {
+    MuslyBackendService? muslyBackendService,
+  }) : _muslyBackendService = muslyBackendService ?? MuslyBackendService();
 
   SubsonicService get subsonicService => _subsonicService;
   bool get isLocalOnlyMode => _localOnlyMode;
@@ -712,7 +718,39 @@ class LibraryProvider extends ChangeNotifier implements AndroidAutoLibraryDelega
     if (_localOnlyMode) {
       return _searchLocal(query);
     }
-    return await _subsonicService.search(query);
+
+    final subsonicResult = await _subsonicService.search(query);
+    final bridgeUrl = _bridgeBaseUrl();
+    if (bridgeUrl == null) {
+      return subsonicResult;
+    }
+
+    try {
+      final ytResult = await _muslyBackendService.searchSongs(bridgeUrl, query);
+      final mergedSongs = <Song>[];
+      final seen = <String>{};
+
+      for (final song in subsonicResult.songs) {
+        if (seen.add(song.id)) {
+          mergedSongs.add(song);
+        }
+      }
+
+      for (final song in ytResult.songs) {
+        if (seen.add(song.id)) {
+          mergedSongs.add(song);
+        }
+      }
+
+      return SearchResult(
+        artists: subsonicResult.artists,
+        albums: subsonicResult.albums,
+        songs: mergedSongs,
+      );
+    } catch (e) {
+      debugPrint('YouTube bridge search failed: $e');
+      return subsonicResult;
+    }
   }
 
   Future<void> cacheSongLocally(Song song) async {
@@ -836,6 +874,171 @@ class LibraryProvider extends ChangeNotifier implements AndroidAutoLibraryDelega
     } catch (_) {
       return [];
     }
+  }
+
+  String? _bridgeBaseUrl() => _subsonicService.bridgeUrl;
+
+  Future<Map<String, DateTime>> getSongsAddedDates() async {
+    final bridgeUrl = _bridgeBaseUrl();
+    if (bridgeUrl == null) return {};
+    return _muslyBackendService.getSongsAddedDates(bridgeUrl);
+  }
+
+  Future<String> duplicatePlaylist(String playlistId) async {
+    final playlist = await getPlaylist(playlistId);
+    final songIds =
+        playlist.songs?.map((s) => s.id).toList() ?? const <String>[];
+
+    final base = playlist.name;
+    String candidate = '$base (Copy)';
+    int copyNumber = 2;
+    while (_playlists.any(
+      (p) => p.name.toLowerCase() == candidate.toLowerCase(),
+    )) {
+      candidate = '$base (Copy $copyNumber)';
+      copyNumber++;
+    }
+
+    await createPlaylist(candidate, songIds: songIds);
+    return candidate;
+  }
+
+  Future<int> deletePlaylistWithSongs(String playlistId) async {
+    final playlist = await getPlaylist(playlistId);
+    final songIds =
+        playlist.songs?.map((s) => s.id).toList() ?? const <String>[];
+
+    await deletePlaylist(playlistId);
+
+    int removed = 0;
+    final bridgeUrl = _bridgeBaseUrl();
+    if (bridgeUrl != null && songIds.isNotEmpty) {
+      final result =
+          await _muslyBackendService.deleteSongsBatch(bridgeUrl, songIds);
+      removed = result.deleted;
+      final removedIds =
+          songIds.where((id) => !result.failedIds.contains(id)).toSet();
+      if (result.deleted > 0 && removedIds.isNotEmpty) {
+        _cachedAllSongs = _cachedAllSongs
+            .where((s) => !removedIds.contains(s.id))
+            .toList();
+        _randomSongs =
+            _randomSongs.where((s) => !removedIds.contains(s.id)).toList();
+        await _saveCachedData();
+        notifyListeners();
+      }
+    }
+
+    return removed;
+  }
+
+  Future<int> deleteAlbum(String albumId) async {
+    final songs = await getAlbumSongs(albumId);
+    final songIds = songs.map((s) => s.id).toList();
+    final bridgeUrl = _bridgeBaseUrl();
+    if (bridgeUrl == null || songIds.isEmpty) {
+      throw Exception(
+        'Album cannot be deleted: bridge unavailable or album has no songs',
+      );
+    }
+
+    final result =
+        await _muslyBackendService.deleteSongsBatch(bridgeUrl, songIds);
+    if (result.deleted == 0) {
+      throw Exception('No songs could be deleted');
+    }
+
+    final removedIds =
+        songIds.where((id) => !result.failedIds.contains(id)).toSet();
+    if (result.deleted > 0 && removedIds.isNotEmpty) {
+      _cachedAllSongs = _cachedAllSongs
+          .where((s) => !removedIds.contains(s.id))
+          .toList();
+      _randomSongs =
+          _randomSongs.where((s) => !removedIds.contains(s.id)).toList();
+      _recentAlbums = _recentAlbums.where((a) => a.id != albumId).toList();
+      _cachedAllAlbums =
+          _cachedAllAlbums.where((a) => a.id != albumId).toList();
+      await _saveCachedData();
+      notifyListeners();
+    }
+
+    return result.deleted;
+  }
+
+  String? _youtubeKeyFromSong(Song song) {
+    final sourceId =
+        song.sourceId ?? (song.id.startsWith('yt:') ? song.id.substring(3) : null);
+    if (sourceId == null || sourceId.isEmpty) {
+      return null;
+    }
+    return sourceId;
+  }
+
+  bool isYouTubeSavedInLibraryByKey(String key) {
+    if (_savedYouTubeKeys.contains(key)) {
+      return true;
+    }
+    return _cachedAllSongs.any((song) {
+      final songKey = _youtubeKeyFromSong(song);
+      return songKey == key;
+    });
+  }
+
+  void updateYouTubeSavedState(String sourceId, bool saved) {
+    if (saved) {
+      _savedYouTubeKeys.add(sourceId);
+    } else {
+      _savedYouTubeKeys.remove(sourceId);
+    }
+
+    Song patch(Song song) {
+      final songSourceId = song.sourceId ?? (song.id.startsWith('yt:') ? song.id.substring(3) : null);
+      if (songSourceId != sourceId) {
+        return song;
+      }
+      if (song.saved == saved) {
+        return song;
+      }
+      return song.copyWith(saved: saved);
+    }
+
+    _cachedAllSongs = _cachedAllSongs.map(patch).toList();
+    _randomSongs = _randomSongs.map(patch).toList();
+    _starred = _starred == null
+        ? null
+        : SearchResult(
+            artists: _starred!.artists,
+            albums: _starred!.albums,
+            songs: _starred!.songs.map(patch).toList(),
+          );
+
+    notifyListeners();
+  }
+
+  Future<void> refreshAllSongsCache() async {
+    if (_localOnlyMode && _localMusicService != null) {
+      _cachedAllSongs = List.from(_localMusicService!.songs);
+      _randomSongs = _cachedAllSongs.take(50).toList();
+      notifyListeners();
+      return;
+    }
+
+    final fetchedSongs = await getAllSongs();
+    if (fetchedSongs.isEmpty && _cachedAllSongs.isNotEmpty) {
+      return;
+    }
+
+    final dedupedById = <String, Song>{};
+    for (final song in fetchedSongs) {
+      dedupedById[song.id] = song;
+    }
+
+    _cachedAllSongs = dedupedById.values.toList();
+    _randomSongs = _cachedAllSongs.take(50).toList();
+    _lastCacheUpdate = DateTime.now();
+    await _saveCachedData();
+    notifyListeners();
   }
 
   @override

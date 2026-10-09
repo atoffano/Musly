@@ -19,7 +19,9 @@ import 'package:musly/screens/media/song_collection_screen.dart';
 import 'package:musly/screens/media/favorites_screen.dart';
 import 'package:musly/screens/settings/settings_screen.dart';
 import 'package:musly/screens/wrapped/wrapped_screen.dart';
-import 'package:musly/services/wrapped_service.dart';
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:musly/providers/recommendations_provider.dart';
+import 'package:musly/screens/media/recommendations_screen.dart';
 import 'package:musly/l10n/app_localizations.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -36,6 +38,36 @@ class _HomeScreenState extends State<HomeScreen> {
   List<Song> _cachedTopHits = const [];
   String _lastRandomKey = '';
   String _selectedCategory = 'All';
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadRecommendations();
+    });
+  }
+
+  String _resolveBridgeUrl() {
+    return Provider.of<SubsonicService>(context, listen: false).bridgeUrl ?? '';
+  }
+
+  Future<void> _loadRecommendations() async {
+    try {
+      final bridgeUrl = _resolveBridgeUrl();
+      if (bridgeUrl.isNotEmpty) {
+        final recProvider =
+            Provider.of<RecommendationsProvider>(context, listen: false);
+        if (!recProvider.initialized) {
+          recProvider.loadMoodCategories(bridgeUrl);
+        }
+        if (!recProvider.featuredInitialized) {
+          recProvider.loadFeaturedPlaylists(bridgeUrl);
+        }
+      }
+    } catch (e) {
+      debugPrint('Failed to load recommendations on home screen: $e');
+    }
+  }
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
@@ -137,15 +169,15 @@ class _HomeScreenState extends State<HomeScreen> {
                   onPressed: () =>
                       NavigationHelper.push(context, const HistoryScreen()),
                 ),
-                IconButton(
-                  icon: Icon(
-                    CupertinoIcons.gear_alt,
-                    color: isDark ? Colors.white : Colors.black87,
-                    size: 22,
+                Padding(
+                  padding: const EdgeInsets.only(right: 12),
+                  child: Center(
+                    child: UserProfileAvatar(
+                      size: 42,
+                      onTap: () =>
+                          NavigationHelper.push(context, const SettingsScreen()),
+                    ),
                   ),
-                  tooltip: AppLocalizations.of(context)!.settings,
-                  onPressed: () =>
-                      NavigationHelper.push(context, const SettingsScreen()),
                 ),
                 if (isDesktop) const SizedBox(width: 12),
               ],
@@ -316,6 +348,226 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const SizedBox(height: 28),
                         ],
+                        // YT Music Featured Playlists section
+                        Consumer<RecommendationsProvider>(
+                          builder: (context, recProvider, _) {
+                            if (recProvider.loadingFeatured && !recProvider.hasFeaturedData) {
+                              return Padding(
+                                padding: EdgeInsets.symmetric(horizontal: hPad),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        const YouTubeMusicLogo(size: 20),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          AppLocalizations.of(context)?.featuredPlaylists ?? 'Featured Playlists',
+                                          style: TextStyle(
+                                            fontSize: isDesktop ? 20 : 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: isDark ? Colors.white : Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    const SizedBox(height: 12),
+                                    SizedBox(
+                                      height: (isDesktop ? 160.0 : 130.0) + 56.0,
+                                      child: ListView.builder(
+                                        scrollDirection: Axis.horizontal,
+                                        itemCount: 6,
+                                        itemBuilder: (_, __) => Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5),
+                                          child: Container(
+                                            width: isDesktop ? 160.0 : 130.0,
+                                            height: isDesktop ? 160.0 : 130.0,
+                                            decoration: BoxDecoration(
+                                              color: isDark ? const Color(0xFF282828) : Colors.grey[200],
+                                              borderRadius: BorderRadius.circular(10),
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 24),
+                                  ],
+                                ),
+                              );
+                            }
+
+                            if (!recProvider.hasFeaturedData) {
+                              return const SizedBox.shrink();
+                            }
+
+                            final effectiveBridgeUrl = _resolveBridgeUrl();
+                            final cardSize = isDesktop ? 160.0 : 130.0;
+                            final totalHeight = cardSize + 56.0;
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: hPad),
+                                  child: Row(
+                                    children: [
+                                      const YouTubeMusicLogo(size: 20),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        AppLocalizations.of(context)?.featuredPlaylists ?? 'Featured Playlists',
+                                        style: TextStyle(
+                                          fontSize: isDesktop ? 20 : 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: isDark ? Colors.white : Colors.black87,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  height: totalHeight,
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    padding: EdgeInsets.symmetric(horizontal: hPad - 5),
+                                    itemCount: recProvider.featuredPlaylists.length,
+                                    itemBuilder: (context, index) {
+                                      final playlist = recProvider.featuredPlaylists[index];
+                                      return _FeaturedPlaylistSquareCard(
+                                        playlist: playlist,
+                                        size: cardSize,
+                                        onTap: () => NavigationHelper.push(
+                                          context,
+                                          PlaylistSongsScreen(
+                                            playlistTitle: playlist.title,
+                                            playlistId: playlist.playlistId,
+                                            bridgeUrl: effectiveBridgeUrl,
+                                            thumbnailUrl: playlist.thumbnailUrl,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                              ],
+                            );
+                          },
+                        ),
+
+                        // YT Music Moods & Genres recommendations section
+                        Consumer<RecommendationsProvider>(
+                          builder: (context, recProvider, _) {
+                            if (recProvider.loading || !recProvider.hasData) {
+                              return const SizedBox.shrink();
+                            }
+                            final previewCats = <MapEntry<String, dynamic>>[];
+                            for (final section in recProvider.sections) {
+                              for (final cat in section.categories.take(4)) {
+                                previewCats.add(MapEntry(section.name, cat));
+                              }
+                              if (previewCats.length >= 8) break;
+                            }
+                            if (previewCats.isEmpty) return const SizedBox.shrink();
+                            final effectiveBridgeUrl = _resolveBridgeUrl();
+
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: hPad),
+                                  child: GestureDetector(
+                                    onTap: () => NavigationHelper.push(
+                                      context,
+                                      const RecommendationsScreen(),
+                                    ),
+                                    child: Row(
+                                      children: [
+                                        const YouTubeMusicLogo(size: 20),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          AppLocalizations.of(context)?.recommendations ?? 'Recommendations',
+                                          style: TextStyle(
+                                            fontSize: isDesktop ? 20 : 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: isDark ? Colors.white : Colors.black87,
+                                          ),
+                                        ),
+                                        const Spacer(),
+                                        Icon(
+                                          CupertinoIcons.chevron_forward,
+                                          size: 16,
+                                          color: isDark ? Colors.white54 : Colors.black45,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 12),
+                                SizedBox(
+                                  height: 80,
+                                  child: ListView.builder(
+                                    scrollDirection: Axis.horizontal,
+                                    padding: EdgeInsets.symmetric(horizontal: hPad - 4),
+                                    itemCount: previewCats.length,
+                                    itemBuilder: (context, index) {
+                                      final cat = previewCats[index].value;
+                                      final colors = [
+                                        [const Color(0xFF8B5CF6), const Color(0xFFEC4899)],
+                                        [const Color(0xFF10B981), const Color(0xFF06B6D4)],
+                                        [const Color(0xFFF59E0B), const Color(0xFFEF4444)],
+                                        [const Color(0xFF3B82F6), const Color(0xFF6366F1)],
+                                      ];
+                                      final pair = colors[index % colors.length];
+                                      return Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                                        child: SizedBox(
+                                          width: 120,
+                                          child: Material(
+                                            color: Colors.transparent,
+                                            child: InkWell(
+                                              borderRadius: BorderRadius.circular(10),
+                                              onTap: () => NavigationHelper.push(
+                                                context,
+                                                MoodPlaylistsScreen(
+                                                  categoryTitle: cat.title,
+                                                  categoryParams: cat.params,
+                                                  bridgeUrl: effectiveBridgeUrl,
+                                                ),
+                                              ),
+                                              child: Container(
+                                                decoration: BoxDecoration(
+                                                  gradient: LinearGradient(
+                                                    colors: pair,
+                                                    begin: Alignment.topLeft,
+                                                    end: Alignment.bottomRight,
+                                                  ),
+                                                  borderRadius: BorderRadius.circular(10),
+                                                ),
+                                                padding: const EdgeInsets.all(10),
+                                                child: Text(
+                                                  cat.title,
+                                                  style: const TextStyle(
+                                                    color: Colors.white,
+                                                    fontWeight: FontWeight.bold,
+                                                    fontSize: 13,
+                                                  ),
+                                                  maxLines: 2,
+                                                  overflow: TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                const SizedBox(height: 24),
+                              ],
+                            );
+                          },
+                        ),
                         if ((_selectedCategory == 'All' ||
                                 _selectedCategory == 'MadeForYou') &&
                             recommendationService.enabled &&
@@ -737,6 +989,91 @@ class _HomeScreenState extends State<HomeScreen> {
                     color: Colors.white, size: 20),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FeaturedPlaylistSquareCard extends StatelessWidget {
+  final MoodPlaylist playlist;
+  final VoidCallback onTap;
+  final double size;
+
+  const _FeaturedPlaylistSquareCard({
+    required this.playlist,
+    required this.onTap,
+    this.size = 140,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 5),
+      child: SizedBox(
+        width: size,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(10),
+          onTap: onTap,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: size,
+                height: size,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(10),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(10),
+                  child: playlist.thumbnailUrl != null &&
+                          playlist.thumbnailUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: playlist.thumbnailUrl!,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => Container(
+                            color: isDark ? const Color(0xFF282828) : Colors.grey[200],
+                            child: const Icon(CupertinoIcons.music_albums, size: 40),
+                          ),
+                        )
+                      : Container(
+                          color: isDark ? const Color(0xFF282828) : Colors.grey[200],
+                          child: const Icon(CupertinoIcons.music_albums, size: 40),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                playlist.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: isDark ? Colors.white : Colors.black87,
+                ),
+              ),
+              if (playlist.subtitle != null && playlist.subtitle!.isNotEmpty)
+                Text(
+                  playlist.subtitle!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: isDark ? Colors.white54 : Colors.black54,
+                  ),
+                ),
+            ],
           ),
         ),
       ),

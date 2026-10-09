@@ -312,10 +312,6 @@ class _ServerSwitcherSheetState extends State<ServerSwitcherSheet> {
                         onDelete: () => _confirmDeleteProfile(profile),
                       );
                     }),
-                    if (!kIsWeb && !Platform.isIOS && !hasYtStream) ...[
-                      const SizedBox(height: 12),
-                      _buildQuickAddYtStreamTile(context),
-                    ],
                     const SizedBox(height: 12),
                     Divider(
                         height: 1,

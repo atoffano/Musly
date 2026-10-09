@@ -5,6 +5,22 @@ All notable changes to Musly will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.2-pipeline] - 2026-10-09
+
+### Added
+
+- **Music Pipeline Bridge Integration (Upstream 2.0.2 Modular Port)**
+  - Rebased custom fork functionalities onto Upstream v2.0.2 via modular 6-phase upgrade plan (`UPGRADE.md`).
+  - **Bridge Backend Service**: `MuslyBackendService` handling stream resolution (`/api/stream`), live YouTube track ingestion (`/api/save`), job polling (`/api/job/{job_id}`), scrobbling (`/api/scrobble`), artist discovery, and bridge health checks (`/health`).
+  - **Zero-Footprint Streaming**: Replaced client-side `youtube_explode_dart` / `yt-dlp` dependencies with server-side `music-pipeline` backend bridge.
+  - **YouTube Music Recommendations**: Restored personalized recommendations categories, featured playlists (`_FeaturedPlaylistSquareCard`), and quick picks on `HomeScreen`.
+  - **Multi-Destination Scrobbling**: Synchronous dual-scrobbling to both Navidrome/Subsonic and `music-pipeline` bridge upon track completion (`PlayerProvider`).
+  - **Interactive YouTube Save Workflow**: Added 1-tap save/download toggle with real-time job polling and library state synchronization across `SongTile`, `SongOptionsModal`, and `NowPlayingScreen`.
+  - **Spotify Migration Wizard**: Full dual-route (OAuth + JSON export) playlist and track migration wizard integrated into Server Settings (`SpotifyMigrationScreen`).
+  - **Pipeline Logs Viewer**: Live ingestion log viewer with auto-refresh integrated into Server Settings (`PipelineLogsScreen`).
+  - **Navigation & Library Enhancements**: Added 42px user profile avatar button in Home and Library app bar actions, long-press actions for albums/playlists with batch deletion and duplicate support.
+  - **Unit Tests**: Ported `Song` YouTube model tests and `MuslyBackendService` search/adapter unit tests.
+
 ## [2.0.2] - 2026-08-26
 
 ### Added

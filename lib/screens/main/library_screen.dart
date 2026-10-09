@@ -20,6 +20,8 @@ import 'package:musly/screens/auth/add_server_screen.dart';
 import 'package:musly/l10n/app_localizations.dart';
 import 'package:musly/services/offline_service.dart';
 import 'package:musly/widgets/common/playlist_artwork.dart';
+import 'package:musly/widgets/common/user_profile_avatar.dart';
+import 'package:musly/widgets/modals/playlist_options_sheet.dart';
 import 'package:musly/screens/settings/settings_screen.dart';
 import 'package:musly/models/playlist.dart';
 import 'package:musly/models/album.dart';
@@ -58,6 +60,7 @@ class _LibraryItem {
   final String subtitle;
   final dynamic data;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
 
   const _LibraryItem({
     required this.type,
@@ -65,6 +68,7 @@ class _LibraryItem {
     required this.subtitle,
     this.data,
     required this.onTap,
+    this.onLongPress,
   });
 }
 
@@ -316,6 +320,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
               context,
               PlaylistScreen(playlistId: p.id, playlistName: p.name),
             ),
+            onLongPress: () => _showPlaylistOptionsSheet(context, p),
           ),
         );
       }
@@ -332,9 +337,10 @@ class _LibraryScreenState extends State<LibraryScreen> {
           _LibraryItem(
             type: _LibraryItemType.album,
             title: a.name,
-            subtitle: 'Album \u2022 ${a.artist}',
+            subtitle: 'Album • ${a.artist}',
             data: a,
             onTap: () => _navigate(context, AlbumScreen(albumId: a.id)),
+            onLongPress: () => _showAlbumOptionsSheet(context, a),
           ),
         );
       }
@@ -484,13 +490,15 @@ class _LibraryScreenState extends State<LibraryScreen> {
                     tooltip: AppLocalizations.of(context)!.add,
                     onPressed: () => _showAddMenu(context),
                   ),
-                  IconButton(
-                    icon: Icon(CupertinoIcons.gear_alt,
-                        color: isDark ? Colors.white : Colors.black87,
-                        size: 22),
-                    tooltip: AppLocalizations.of(context)!.settings,
-                    onPressed: () =>
-                        NavigationHelper.push(context, const SettingsScreen()),
+                  Padding(
+                    padding: const EdgeInsets.only(right: 12),
+                    child: Center(
+                      child: UserProfileAvatar(
+                        size: 42,
+                        onTap: () => NavigationHelper.push(
+                            context, const SettingsScreen()),
+                      ),
+                    ),
                   ),
                   if (_isDesktop) const SizedBox(width: 12),
                 ],
@@ -929,6 +937,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ),
           ),
           onTap: item.onTap,
+          onLongPress: item.onLongPress,
         );
 
       case _LibraryItemType.album:
@@ -956,6 +965,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             ),
           ),
           onTap: item.onTap,
+          onLongPress: item.onLongPress,
         );
 
       case _LibraryItemType.artist:
@@ -1126,6 +1136,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
             child: PlaylistArtwork(playlist: playlist, size: 240),
           ),
           onTap: item.onTap,
+          onLongPress: item.onLongPress,
         );
 
       case _LibraryItemType.album:
@@ -1135,6 +1146,7 @@ class _LibraryScreenState extends State<LibraryScreen> {
           subtitle: item.subtitle,
           imageUrl: album.coverArt,
           onTap: item.onTap,
+          onLongPress: item.onLongPress,
         );
 
       case _LibraryItemType.artist:
@@ -1210,10 +1222,12 @@ class _LibraryScreenState extends State<LibraryScreen> {
     Widget? customArtwork,
     bool isRound = false,
     required VoidCallback onTap,
+    VoidCallback? onLongPress,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
+      onLongPress: onLongPress,
       borderRadius: BorderRadius.circular(8),
       child: Column(
         crossAxisAlignment:
@@ -1266,5 +1280,268 @@ class _LibraryScreenState extends State<LibraryScreen> {
         break;
     }
     return list;
+  }
+
+  bool _isPlaylistActionBusy = false;
+
+  void _showPlaylistOptionsSheet(BuildContext context, Playlist item) {
+    if (_isPlaylistActionBusy) return;
+
+    showPlaylistOptionsSheet(
+      context,
+      title: item.name,
+      onDuplicate: () async {
+        final messenger = ScaffoldMessenger.of(context);
+        final libraryProvider =
+            Provider.of<LibraryProvider>(context, listen: false);
+        _isPlaylistActionBusy = true;
+        try {
+          final name = await libraryProvider.duplicatePlaylist(item.id);
+          messenger.showSnackBar(
+            SnackBar(
+              content: Text('Duplicated as "$name"'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        } catch (e) {
+          messenger.showSnackBar(
+            const SnackBar(
+              content: Text('Failed to duplicate playlist'),
+              behavior: SnackBarBehavior.floating,
+              backgroundColor: Colors.red,
+            ),
+          );
+        } finally {
+          _isPlaylistActionBusy = false;
+        }
+      },
+      onDelete: () {
+        if (_isPlaylistActionBusy) return;
+        Navigator.pop(context);
+        _showDeletePlaylistDialog(context, item);
+      },
+      onDeleteWithSongs: () {
+        if (_isPlaylistActionBusy) return;
+        Navigator.pop(context);
+        _showDeletePlaylistWithSongsDialog(context, item);
+      },
+    );
+  }
+
+  void _showDeletePlaylistDialog(BuildContext context, Playlist item) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(AppLocalizations.of(context)?.deletePlaylist ?? 'Delete Playlist'),
+        content: Text('Are you sure you want to delete the playlist "${item.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(AppLocalizations.of(context)?.cancel ?? 'Cancel'),
+          ),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              final libraryProvider =
+                  Provider.of<LibraryProvider>(context, listen: false);
+              try {
+                await libraryProvider.deletePlaylist(item.id);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Deleted playlist "${item.name}"'),
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to delete playlist: $e'),
+                      behavior: SnackBarBehavior.floating,
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
+            },
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: Text(AppLocalizations.of(context)?.delete ?? 'Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeletePlaylistWithSongsDialog(BuildContext context, Playlist item) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _DeleteConfirmDialog(
+        title: 'Delete & Remove Songs',
+        message:
+            'This will delete the playlist "${item.name}" and permanently '
+            'remove its songs from your library. The audio files will be '
+            'deleted and cannot be recovered.',
+        confirmLabel: 'Delete & Remove',
+        onDelete: () async {
+          final libraryProvider =
+              Provider.of<LibraryProvider>(dialogContext, listen: false);
+          _isPlaylistActionBusy = true;
+          int? removed;
+          bool succeeded = false;
+          try {
+            removed = await libraryProvider.deletePlaylistWithSongs(item.id);
+            succeeded = true;
+          } finally {
+            _isPlaylistActionBusy = false;
+          }
+          return (succeeded, removed ?? 0);
+        },
+        onResult: (succeeded, removed) {
+          final messenger = ScaffoldMessenger.of(context);
+          if (succeeded) {
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Playlist deleted - $removed songs removed from library',
+                ),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          } else {
+            messenger.showSnackBar(
+              const SnackBar(
+                content: Text('Failed to delete playlist'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  void _showAlbumOptionsSheet(BuildContext context, Album item) {
+    if (_isPlaylistActionBusy) return;
+
+    showAlbumOptionsSheet(
+      context,
+      title: item.name,
+      onDelete: () {
+        if (_isPlaylistActionBusy) return;
+        Navigator.pop(context);
+        _showDeleteAlbumDialog(context, item);
+      },
+    );
+  }
+
+  void _showDeleteAlbumDialog(BuildContext context, Album item) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => _DeleteConfirmDialog(
+        title: 'Delete Album',
+        message:
+            'This will permanently delete the album "${item.name}" and its '
+            'songs from your library. The audio files will be deleted and '
+            'cannot be recovered.',
+        confirmLabel: 'Delete Album',
+        onDelete: () async {
+          final libraryProvider =
+              Provider.of<LibraryProvider>(dialogContext, listen: false);
+          _isPlaylistActionBusy = true;
+          int? removed;
+          bool succeeded = false;
+          try {
+            removed = await libraryProvider.deleteAlbum(item.id);
+            succeeded = true;
+          } finally {
+            _isPlaylistActionBusy = false;
+          }
+          return (succeeded, removed ?? 0);
+        },
+        onResult: (succeeded, removed) {
+          final messenger = ScaffoldMessenger.of(context);
+          if (succeeded) {
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Album deleted - $removed songs removed from library',
+                ),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          } else {
+            messenger.showSnackBar(
+              const SnackBar(
+                content: Text('Failed to delete album'),
+                behavior: SnackBarBehavior.floating,
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        },
+      ),
+    );
+  }
+}
+
+class _DeleteConfirmDialog extends StatefulWidget {
+  final String title;
+  final String message;
+  final String confirmLabel;
+  final Future<(bool, int)> Function() onDelete;
+  final void Function(bool succeeded, int removed) onResult;
+
+  const _DeleteConfirmDialog({
+    required this.title,
+    required this.message,
+    required this.confirmLabel,
+    required this.onDelete,
+    required this.onResult,
+  });
+
+  @override
+  State<_DeleteConfirmDialog> createState() => _DeleteConfirmDialogState();
+}
+
+class _DeleteConfirmDialogState extends State<_DeleteConfirmDialog> {
+  bool _isDeleting = false;
+
+  Future<void> _confirmDelete() async {
+    if (_isDeleting) return;
+    setState(() => _isDeleting = true);
+    final result = await widget.onDelete();
+    final succeeded = result.$1;
+    final removed = result.$2;
+    if (mounted) {
+      Navigator.pop(context);
+    }
+    widget.onResult(succeeded, removed);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: _isDeleting
+          ? const SizedBox(
+              height: 60,
+              child: Center(child: CircularProgressIndicator()),
+            )
+          : Text(widget.message),
+      actions: [
+        TextButton(
+          onPressed: _isDeleting ? null : () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        TextButton(
+          onPressed: _isDeleting ? null : _confirmDelete,
+          style: TextButton.styleFrom(foregroundColor: Colors.red),
+          child: Text(widget.confirmLabel),
+        ),
+      ],
+    );
   }
 }

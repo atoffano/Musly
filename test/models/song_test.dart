@@ -11,6 +11,10 @@ void main() {
         'artist': 'Test Artist',
         'duration': 180,
         'track': 5,
+        'sourceType': 'youtube',
+        'sourceId': 'dQw4w9WgXcQ',
+        'streamUrl': null,
+        'saved': true,
       };
 
       final song = Song.fromJson(json);
@@ -21,6 +25,9 @@ void main() {
       expect(song.artist, 'Test Artist');
       expect(song.duration, 180);
       expect(song.track, 5);
+      expect(song.sourceType, 'youtube');
+      expect(song.sourceId, 'dQw4w9WgXcQ');
+      expect(song.saved, true);
     });
 
     test('should handle missing fields in JSON', () {
@@ -59,6 +66,9 @@ void main() {
         artist: 'Test Artist',
         duration: 180,
         track: 5,
+        sourceType: 'youtube',
+        sourceId: 'dQw4w9WgXcQ',
+        saved: true,
       );
 
       final json = song.toJson();
@@ -69,6 +79,9 @@ void main() {
       expect(json['artist'], 'Test Artist');
       expect(json['duration'], 180);
       expect(json['track'], 5);
+      expect(json['sourceType'], 'youtube');
+      expect(json['sourceId'], 'dQw4w9WgXcQ');
+      expect(json['saved'], true);
     });
 
     test('should format duration correctly', () {
@@ -80,6 +93,11 @@ void main() {
 
       final song3 = Song(id: '3', title: 'Song 3', duration: null);
       expect(song3.formattedDuration, '0:00');
+    });
+
+    test('should detect YouTube source from id prefix', () {
+      final song = Song(id: 'yt:dQw4w9WgXcQ', title: 'Test Song');
+      expect(song.isYouTube, true);
     });
   });
 }
