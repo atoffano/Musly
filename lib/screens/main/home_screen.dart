@@ -1065,9 +1065,9 @@ class _FeaturedPlaylistSquareCard extends StatelessWidget {
                   color: isDark ? Colors.white : Colors.black87,
                 ),
               ),
-              if (playlist.subtitle != null && playlist.subtitle!.isNotEmpty)
+              if (playlist.description != null && playlist.description!.isNotEmpty)
                 Text(
-                  playlist.subtitle!,
+                  playlist.description!,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(

@@ -458,7 +458,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
               icon,
               size: 20,
               color: isSelected
-                  ? AppTheme.spotifyGreen
+                  ? AppTheme.brandGreen
                   : (_isDark ? Colors.grey.shade400 : Colors.grey.shade600),
             ),
             const SizedBox(width: 8),
@@ -484,7 +484,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
                     style: TextStyle(
                       fontSize: 10.5,
                       color: isSelected
-                          ? AppTheme.spotifyGreen
+                          ? AppTheme.brandGreen
                           : (_isDark ? Colors.grey.shade500 : Colors.grey.shade600),
                     ),
                     maxLines: 1,
@@ -549,18 +549,18 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppTheme.spotifyGreen.withOpacity(0.4)),
+            border: Border.all(color: AppTheme.brandGreen.withOpacity(0.4)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  const Icon(CupertinoIcons.lightbulb_fill, color: AppTheme.spotifyGreen, size: 18),
+                  const Icon(CupertinoIcons.lightbulb_fill, color: AppTheme.brandGreen, size: 18),
                   const SizedBox(width: 8),
                   const Text(
                     '15-Second Trick for "Liked Songs"',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.spotifyGreen),
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.brandGreen),
                   ),
                 ],
               ),
@@ -619,7 +619,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
                   : const Icon(CupertinoIcons.search, size: 16),
               label: Text(_isPreviewingUrls ? 'Resolving...' : 'Preview URLs'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.spotifyGreen,
+                backgroundColor: AppTheme.brandGreen,
                 foregroundColor: Colors.black,
                 padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -661,7 +661,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
                     ),
                     Text(
                       '$_urlTotalTracks tracks',
-                      style: const TextStyle(color: AppTheme.spotifyGreen, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: AppTheme.brandGreen, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
@@ -689,7 +689,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
             onChanged: (val) => setState(() => _urlStarLikedSongs = val ?? true),
             controlAffinity: ListTileControlAffinity.leading,
             dense: true,
-            activeColor: AppTheme.spotifyGreen,
+            activeColor: AppTheme.brandGreen,
           ),
           CheckboxListTile(
             title: const Text('Reconstruct Navidrome Playlists', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
@@ -698,7 +698,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
             onChanged: (val) => setState(() => _urlCreatePlaylists = val ?? true),
             controlAffinity: ListTileControlAffinity.leading,
             dense: true,
-            activeColor: AppTheme.spotifyGreen,
+            activeColor: AppTheme.brandGreen,
           ),
           const SizedBox(height: 14),
           SizedBox(
@@ -709,7 +709,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
               icon: const Icon(CupertinoIcons.play_arrow_solid, size: 18),
               label: Text('Start Fast Migration ($_urlTotalTracks Songs)', style: const TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.spotifyGreen,
+                backgroundColor: AppTheme.brandGreen,
                 foregroundColor: Colors.black,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
@@ -842,7 +842,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
               : const Icon(CupertinoIcons.search, size: 16),
           label: Text(_isInspectingDump ? 'Scanning Dump Files...' : 'Inspect Dump Data'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppTheme.spotifyGreen,
+            backgroundColor: AppTheme.brandGreen,
             foregroundColor: Colors.black,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -924,7 +924,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
             onChanged: (val) => setState(() => _dumpImportLibrary = val ?? true),
             controlAffinity: ListTileControlAffinity.leading,
             dense: true,
-            activeColor: AppTheme.spotifyGreen,
+            activeColor: AppTheme.brandGreen,
           ),
 
           CheckboxListTile(
@@ -934,7 +934,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
             onChanged: (val) => setState(() => _dumpImportPlaylists = val ?? true),
             controlAffinity: ListTileControlAffinity.leading,
             dense: true,
-            activeColor: AppTheme.spotifyGreen,
+            activeColor: AppTheme.brandGreen,
           ),
 
           if (_dumpImportPlaylists && _dumpSummary!['playlists'] is List) ...[
@@ -960,8 +960,8 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
                         }
                       });
                     },
-                    selectedColor: AppTheme.spotifyGreen.withOpacity(0.3),
-                    checkmarkColor: AppTheme.spotifyGreen,
+                    selectedColor: AppTheme.brandGreen.withOpacity(0.3),
+                    checkmarkColor: AppTheme.brandGreen,
                   );
                 }).toList(),
               ),
@@ -975,7 +975,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
             onChanged: (val) => setState(() => _dumpImportScrobbles = val ?? true),
             controlAffinity: ListTileControlAffinity.leading,
             dense: true,
-            activeColor: AppTheme.spotifyGreen,
+            activeColor: AppTheme.brandGreen,
           ),
 
           if (_dumpImportScrobbles) ...[
@@ -993,7 +993,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
                     onChanged: (val) => setState(() => _dumpSyncListenbrainz = val ?? false),
                     controlAffinity: ListTileControlAffinity.leading,
                     dense: true,
-                    activeColor: AppTheme.spotifyGreen,
+                    activeColor: AppTheme.brandGreen,
                   ),
                   CheckboxListTile(
                     title: const Text('Sync with Last.fm', style: TextStyle(fontSize: 12)),
@@ -1005,7 +1005,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
                     onChanged: (val) => setState(() => _dumpSyncLastfm = val ?? false),
                     controlAffinity: ListTileControlAffinity.leading,
                     dense: true,
-                    activeColor: AppTheme.spotifyGreen,
+                    activeColor: AppTheme.brandGreen,
                   ),
                 ],
               ),
@@ -1022,7 +1022,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
               icon: const Icon(CupertinoIcons.play_arrow_solid, size: 18),
               label: const Text('Start Full Data Migration', style: TextStyle(fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppTheme.spotifyGreen,
+                backgroundColor: AppTheme.brandGreen,
                 foregroundColor: Colors.black,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
@@ -1081,7 +1081,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
     switch (kind) {
       case 'account_data':
         label = 'Account Data';
-        color = AppTheme.spotifyGreen;
+        color = AppTheme.brandGreen;
         break;
       case 'streaming_history':
         label = 'Streaming History';
@@ -1199,7 +1199,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.bold,
-              color: migrated ? AppTheme.spotifyGreen : Colors.orangeAccent,
+              color: migrated ? AppTheme.brandGreen : Colors.orangeAccent,
             ),
           ),
         ],
@@ -1246,7 +1246,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isDone
-                  ? AppTheme.spotifyGreen.withOpacity(0.5)
+                  ? AppTheme.brandGreen.withOpacity(0.5)
                   : (isFailed ? Colors.redAccent.withOpacity(0.5) : (_isDark ? AppTheme.darkDivider : AppTheme.lightDivider)),
             ),
           ),
@@ -1262,10 +1262,10 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
                         const SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.spotifyGreen),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.brandGreen),
                         )
                       else if (isDone)
-                        const Icon(CupertinoIcons.checkmark_seal_fill, color: AppTheme.spotifyGreen, size: 20)
+                        const Icon(CupertinoIcons.checkmark_seal_fill, color: AppTheme.brandGreen, size: 20)
                       else
                         const Icon(CupertinoIcons.exclamationmark_circle_fill, color: Colors.redAccent, size: 20),
                       const SizedBox(width: 8),
@@ -1277,7 +1277,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
                   ),
                   Text(
                     '${(progressVal * 100).toInt()}%',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.spotifyGreen),
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.brandGreen),
                   ),
                 ],
               ),
@@ -1289,7 +1289,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
                   minHeight: 8,
                   backgroundColor: _isDark ? Colors.grey.shade800 : Colors.grey.shade300,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    isDone ? AppTheme.spotifyGreen : (isFailed ? Colors.redAccent : AppTheme.spotifyGreen),
+                    isDone ? AppTheme.brandGreen : (isFailed ? Colors.redAccent : AppTheme.brandGreen),
                   ),
                 ),
               ),
@@ -1311,11 +1311,11 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
             decoration: BoxDecoration(
               color: _isDark ? const Color(0xFF222222) : Colors.grey.shade100,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppTheme.spotifyGreen.withOpacity(0.3)),
+              border: Border.all(color: AppTheme.brandGreen.withOpacity(0.3)),
             ),
             child: Row(
               children: [
-                const Icon(CupertinoIcons.music_note, color: AppTheme.spotifyGreen, size: 18),
+                const Icon(CupertinoIcons.music_note, color: AppTheme.brandGreen, size: 18),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -1349,7 +1349,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
               child: _buildMetricChip(
                 label: 'Imported',
                 count: successCount,
-                color: AppTheme.spotifyGreen,
+                color: AppTheme.brandGreen,
               ),
             ),
             const SizedBox(width: 8),
@@ -1423,7 +1423,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
               if (line.contains('Error') || line.contains('Failed')) {
                 textColor = Colors.redAccent;
               } else if (line.contains('Success') || line.contains('Starred') || line.contains('finished')) {
-                textColor = AppTheme.spotifyGreen;
+                textColor = AppTheme.brandGreen;
               }
               return Text(
                 line,
@@ -1456,7 +1456,7 @@ class _SpotifyMigrationScreenState extends State<SpotifyMigrationScreen> {
             icon: const Icon(CupertinoIcons.arrow_left, size: 16),
             label: const Text('Back to Setup'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: AppTheme.spotifyGreen,
+              backgroundColor: AppTheme.brandGreen,
               foregroundColor: Colors.black,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               padding: const EdgeInsets.symmetric(vertical: 12),

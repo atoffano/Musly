@@ -748,11 +748,11 @@ class _PlaylistSongsScreenState extends State<PlaylistSongsScreen> {
                                   width: 48,
                                   height: 48,
                                   decoration: BoxDecoration(
-                                    color: AppTheme.appleMusicRed,
+                                    color: AppTheme.brandRed,
                                     shape: BoxShape.circle,
                                     boxShadow: [
                                       BoxShadow(
-                                        color: AppTheme.appleMusicRed
+                                        color: AppTheme.brandRed
                                             .withValues(alpha: 0.4),
                                         blurRadius: 12,
                                         offset: const Offset(0, 4),

@@ -139,7 +139,7 @@ class _BridgeArtistScreenState extends State<BridgeArtistScreen> {
                       ),
                     )
                   else
-                    Container(color: AppTheme.appleMusicRed.withValues(alpha: 0.15)),
+                    Container(color: AppTheme.brandRed.withValues(alpha: 0.15)),
                   DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
