@@ -571,6 +571,8 @@ class MoodPlaylist {
   final String? description;
   final String? thumbnailUrl;
 
+  String? get subtitle => description;
+
   MoodPlaylist({
     required this.playlistId,
     required this.title,
@@ -590,7 +592,7 @@ class MoodPlaylist {
     return MoodPlaylist(
       playlistId: json['playlistId']?.toString() ?? '',
       title: json['title']?.toString() ?? '',
-      description: json['description']?.toString(),
+      description: json['description']?.toString() ?? json['subtitle']?.toString(),
       thumbnailUrl: thumb ?? json['thumbnailUrl']?.toString(),
     );
   }
