@@ -61,8 +61,8 @@ class _RecommendationsScreenState extends State<RecommendationsScreen> {
               children: [
                 const YouTubeMusicLogo(size: 20),
                 const SizedBox(width: 8),
-                Text(
-                  l10n?.recommendations ?? 'Recommendations',
+                const Text(
+                  'Recommendations',
                 ),
               ],
             ),

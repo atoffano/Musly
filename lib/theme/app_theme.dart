@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 class AppTheme {
   static const Color brandRed = Color(0xFFFA243C);
   static const Color brandPink = Color(0xFFFC5C65);
+  static const Color appleMusicRed = brandRed;
 
   static const Color brandGreen = Color(0xFF1DB954);
   static const Color brandGreenDim = Color(0xFF158A3E);
+  static const Color spotifyGreen = brandGreen;
 
   static const Color lightBackground = Color(0xFFF2F2F7);
   static const Color lightSurface = Colors.white;

@@ -141,8 +141,6 @@ class SubsonicService {
     _stableAuthParams = null;
   }
 
-  ServerConfig? get config => _config;
-
   String? get bridgeUrl => _config?.bridgeUrl;
 
   bool get isYoutube => false;

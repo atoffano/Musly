@@ -22,6 +22,8 @@ import 'package:musly/screens/wrapped/wrapped_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:musly/providers/recommendations_provider.dart';
 import 'package:musly/screens/media/recommendations_screen.dart';
+import 'package:musly/services/musly_backend_service.dart';
+import 'package:musly/services/wrapped_service.dart';
 import 'package:musly/l10n/app_localizations.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -362,7 +364,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         const YouTubeMusicLogo(size: 20),
                                         const SizedBox(width: 8),
                                         Text(
-                                          AppLocalizations.of(context)?.featuredPlaylists ?? 'Featured Playlists',
+                                          'Featured Playlists',
                                           style: TextStyle(
                                             fontSize: isDesktop ? 20 : 18,
                                             fontWeight: FontWeight.bold,
@@ -414,7 +416,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       const YouTubeMusicLogo(size: 20),
                                       const SizedBox(width: 8),
                                       Text(
-                                        AppLocalizations.of(context)?.featuredPlaylists ?? 'Featured Playlists',
+                                        'Featured Playlists',
                                         style: TextStyle(
                                           fontSize: isDesktop ? 20 : 18,
                                           fontWeight: FontWeight.bold,
@@ -486,7 +488,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         const YouTubeMusicLogo(size: 20),
                                         const SizedBox(width: 8),
                                         Text(
-                                          AppLocalizations.of(context)?.recommendations ?? 'Recommendations',
+                                          'Recommendations',
                                           style: TextStyle(
                                             fontSize: isDesktop ? 20 : 18,
                                             fontWeight: FontWeight.bold,

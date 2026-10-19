@@ -2333,6 +2333,7 @@ class PlayerProvider extends ChangeNotifier with WidgetsBindingObserver implemen
       await _checkAndRefillAutoQueue();
       if (_currentIndex < _queue.length - 1) {
         await skipToIndex(_currentIndex + 1);
+      }
     } else if (_repeatMode == RepeatMode.all) {
       if (_queue.length == 1) {
         await seek(Duration.zero);

@@ -53,6 +53,7 @@ class LibraryProvider extends ChangeNotifier implements AndroidAutoLibraryDelega
   }) : _muslyBackendService = muslyBackendService ?? MuslyBackendService();
 
   SubsonicService get subsonicService => _subsonicService;
+  MuslyBackendService get muslyBackendService => _muslyBackendService;
   bool get isLocalOnlyMode => _localOnlyMode;
   bool get isServerOfflineMode => _serverOfflineMode;
   bool get mergeLocalLibrary => _mergeLocalLibrary;
@@ -964,6 +965,14 @@ class LibraryProvider extends ChangeNotifier implements AndroidAutoLibraryDelega
     }
 
     return result.deleted;
+  }
+
+  Future<void> deleteSong(String songId) async {
+    await _subsonicService.deleteSong(songId);
+    _cachedAllSongs = _cachedAllSongs.where((s) => s.id != songId).toList();
+    _randomSongs = _randomSongs.where((s) => s.id != songId).toList();
+    await _saveCachedData();
+    notifyListeners();
   }
 
   String? _youtubeKeyFromSong(Song song) {
